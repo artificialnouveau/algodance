@@ -1,7 +1,22 @@
 import { createBackend, BLAZE_CONNECTIONS, COCO_CONNECTIONS } from "./backends.js";
 
+// The app used to be called Queercoded, so anything saved before the rename
+// still sits under a `queercoded.*` key. Move it across once, on load, before
+// anything reads storage, so existing codes survive the new name.
+(function renameLegacyStorage() {
+  const LEGACY_PREFIX = "queercoded.";
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(LEGACY_PREFIX)) continue;
+      const renamed = "algodance." + key.slice(LEGACY_PREFIX.length);
+      if (localStorage.getItem(renamed) === null) localStorage.setItem(renamed, localStorage.getItem(key));
+      localStorage.removeItem(key);
+    }
+  } catch {}
+})();
+
 // ---------- Config ----------
-const STORE_KEY = "queercoded.templates.v1";
+const STORE_KEY = "algodance.templates.v1";
 const FIXED_LEN = 20;             // frames every gesture is resampled to
 const KEY_LMS = [11, 12];         // shoulders: visibility gate
 const NUM_LMS = 33;
@@ -102,7 +117,7 @@ let rearmWord = null;         // hands-free next-take arming (same word, Teach t
 let rearmSince = 0;
 let warmupOffered = false;    // the Perform warm-up offer shows once per session
 // Teach-on-a-beat tempo, persisted.
-const BPM_KEY = "queercoded.bpm.v1";
+const BPM_KEY = "algodance.bpm.v1";
 function teachBpm() {
   const v = parseInt(bpmInput?.value, 10);
   return isFinite(v) ? Math.min(160, Math.max(60, v)) : 100;
@@ -523,8 +538,8 @@ const ALGOS = {
   "movenet-thunder":  { family: "movenet", label: "MoveNet Thunder (TF.js)" },
   "yolo":             { family: "yolo",    label: "YOLO-Pose (ONNX Runtime Web)" },
 };
-const ALGO_STORE_KEY = "queercoded.algo.v1";
-const YOLO_URL_KEY = "queercoded.yoloModelUrl";
+const ALGO_STORE_KEY = "algodance.algo.v1";
+const YOLO_URL_KEY = "algodance.yoloModelUrl";
 let algoChoice = localStorage.getItem(ALGO_STORE_KEY);
 if (!ALGOS[algoChoice]) algoChoice = "blaze-full";
 let currentFamily = ALGOS[algoChoice].family;
@@ -1267,7 +1282,7 @@ let perfHandsLost = false;        // matching paused because no wrist is tracked
 // thresholds with a comparison against reality.
 // v2: idle windows recorded in square-space normalization (v1 windows were
 // aspect-distorted and are simply abandoned; recalibration takes 10s).
-const BG_KEY = "queercoded.background.v2";
+const BG_KEY = "algodance.background.v2";
 const BG_MARGIN = 0.85;        // best word must beat the background by this factor
 const BG_CAPTURE_MS = 10000;
 let bgStore = {};
@@ -2345,7 +2360,7 @@ function startPlaybackExample(id) {
 }
 
 // ---- Routine: an ordered choreography of saved codes ----
-const ROUTINE_KEY = "queercoded.routine.v1";
+const ROUTINE_KEY = "algodance.routine.v1";
 let routine = [];
 try { routine = JSON.parse(localStorage.getItem(ROUTINE_KEY)) || []; } catch { routine = []; }
 function saveRoutine() {
@@ -3090,7 +3105,7 @@ codeList.addEventListener("click", (e) => {
 });
 
 // ---------- Export / import ----------
-function exportCodes(filename = "queercoded-codes.json") {
+function exportCodes(filename = "algodance-codes.json") {
   const blob = new Blob([JSON.stringify(templates, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -3141,7 +3156,7 @@ importFile.addEventListener("change", async () => {
 clearAllBtn.addEventListener("click", () => {
   if (!confirm("Delete all saved codes? A backup file downloads first, so you can Import it if you change your mind.")) return;
   // Safety net: the wipe always leaves a file behind.
-  if (templates.length) exportCodes("queercoded-codes-backup.json");
+  if (templates.length) exportCodes("algodance-codes-backup.json");
   templates = [];
   saveTemplates();
   renderCodeList();
@@ -3189,7 +3204,7 @@ async function openZine() {
 // Per-page rotation. Some pages hold sideways text; where the PDF has a text
 // layer, the dominant baseline direction detects and fixes that automatically.
 // Old manual per-page rotations are dropped: the defaults below are correct.
-try { localStorage.removeItem("queercoded.zineRot.v1"); } catch {}
+try { localStorage.removeItem("algodance.zineRot.v1"); } catch {}
 // Pages known to be sideways in AlgoDance.pdf, verified against raw renders:
 // 4-6 hold sideways content and need a quarter-turn right; 7 is ALREADY
 // upright and needs none. Absolute viewport rotation, ignoring metadata.
@@ -3406,7 +3421,7 @@ soundToggle.addEventListener("change", () => { soundOn = soundToggle.checked; })
 // its side. Always starts horizontal; the switch lives in the header so it
 // stays reachable from either mode.
 const orientSel = document.getElementById("orientSel");
-localStorage.removeItem("queercoded.orientation.v1"); // orientation no longer persists
+localStorage.removeItem("algodance.orientation.v1"); // orientation no longer persists
 function applyOrientation(mode) {
   // Vertical is a desktop/installation layout; on small screens it fights
   // the fullscreen mobile layout, so it is forced off there.
@@ -3452,7 +3467,7 @@ function escapeHtml(s) {
 
 // ---------- Boot ----------
 // First-run framing hint, shown once until dismissed.
-const INTRO_KEY = "queercoded.seenIntro";
+const INTRO_KEY = "algodance.seenIntro";
 document.getElementById("introDismiss").addEventListener("click", () => {
   introHint.hidden = true;
   localStorage.setItem(INTRO_KEY, "1");
@@ -3460,7 +3475,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("Queercoded build v50 (2026-07-13)");
+  console.log("AlgoDance build v51 (2026-08-06)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();

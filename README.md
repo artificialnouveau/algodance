@@ -1,4 +1,4 @@
-# Queercoded
+# AlgoDance
 
 Code a movement. Move to speak.
 
@@ -75,7 +75,7 @@ The camera needs a secure context, so serve over `localhost` (opening the file
 directly will not get camera access in most browsers):
 
 ```bash
-cd queercoded
+cd algodance
 python3 -m http.server 8000
 # open http://localhost:8000
 ```
@@ -96,7 +96,7 @@ yolo export model=yolov8n-pose.pt format=onnx imgsz=640
 ```
 
 Commit the resulting `yolov8n-pose.onnx` to the repo (note it is several MB) and
-give the app its URL (e.g. `https://<user>.github.io/queercoded/yolov8n-pose.onnx`).
+give the app its URL (e.g. `https://<user>.github.io/algodance/yolov8n-pose.onnx`).
 The URL is remembered in the browser. MoveNet and BlazePose need no setup.
 
 > Note: MoveNet and YOLO-Pose are newer additions and depend on third-party
@@ -146,7 +146,7 @@ The URL is remembered in the browser. MoveNet and BlazePose need no setup.
 1. Push to `main`.
 2. Repo **Settings > Pages > Build and deployment > Deploy from a branch**.
 3. Branch: `main`, folder: `/ (root)`. Save.
-4. Site publishes at `https://artificialnouveau.github.io/queercoded/`.
+4. Site publishes at `https://artificialnouveau.github.io/algodance/`.
 
 ## Docs
 

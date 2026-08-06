@@ -1,11 +1,12 @@
-# Queercoded: Design
+# AlgoDance: Design
 
 A browser app that turns body movement into language. Using a webcam and
 MediaPipe pose tracking, you can **teach** the app a movement (a static pose or
 a short dance) and bind it to a word or phrase, then **perform** that movement
 to make the word appear on screen.
 
-The name plays on "queer coded": movement as a private, embodied code.
+The name is the premise: an algorithm reading a dance, movement as a private,
+embodied code.
 
 ---
 
@@ -153,7 +154,7 @@ A template (one code):
 
 `seq` is the only movement data: normalized pose coordinates. No imagery.
 
-**Storage:** `localStorage` under `queercoded.templates.v1`. Export/import as a
+**Storage:** `localStorage` under `algodance.templates.v1`. Export/import as a
 JSON file is supported for backup and manual sharing today.
 
 ---
@@ -165,7 +166,7 @@ JSON file is supported for backup and manual sharing today.
   animates large over the video; a phrase strip collects matched words.
 - **Look:** bathroom-tile background (white ceramic tiles + grout), with the
   app content as dark, floating cards. Rainbow gradient wordmark. The bathroom
-  motif nods to queer space; "Queercoded" as the title.
+  motif nods to queer space; "AlgoDance" as the title.
 
 ---
 

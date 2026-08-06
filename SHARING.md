@@ -9,7 +9,7 @@ webcam recordings. A shared code is a few kilobytes of numbers.
 
 ## What we already have (no backend)
 
-- **Export / Import JSON** — one person exports `queercoded-codes.json`, another
+- **Export / Import JSON** — one person exports `algodance-codes.json`, another
   imports it. Good for workshops and handoffs. Already implemented.
 
 ## Options for real sharing (pick when we get there)
