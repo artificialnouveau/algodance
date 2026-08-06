@@ -74,7 +74,10 @@ const barEl = document.getElementById("bar");
 let barPct = -1;
 function setBar(pct) {
   const v = Math.max(0, Math.min(100, pct));
-  if (Math.abs(v - barPct) < 0.5) return; // skip sub-pixel rewrites
+  // The sub-pixel guard must not swallow a reset, or the bar keeps a sliver of
+  // fill after being cleared.
+  if (v !== 0 && Math.abs(v - barPct) < 0.5) return;
+  if (v === barPct) return;
   barPct = v;
   barEl.style.setProperty("--fill", (v / 100).toFixed(3));
 }
@@ -2118,7 +2121,7 @@ function applyCutoutState() {
     cctx.clearRect(0, 0, cutout.width, cutout.height);
     maskEma = null; maskW = maskH = 0;
   }
-  backend?.setMask?.(usable);
+  Promise.resolve(backend?.setMask?.(usable)).catch((e) => console.warn("mask toggle failed:", e));
   if (cutoutToggle) {
     cutoutToggle.checked = cutoutOn;
     const unsupported = !backend?.supportsMask;
@@ -3676,6 +3679,11 @@ function activateTab(tab, focus = false) {
   if (teach && name !== "teach") cancelTeach();
   if (bgCapture && name !== "perform") { bgCapture = null; bgBtn.disabled = false; }
   manualCapturing = false;
+  // These latch "the warning is already on screen". activateTab overwrites the
+  // status line, so leaving them set meant the warning could never be shown
+  // again after a tab round trip, even with the hands still out of frame.
+  perfHandsLost = false;
+  teachHandsLost = false;
   moving = false; // drop any half-finished Perform move
   hideClosest();
   setBar(0);
@@ -3739,6 +3747,7 @@ speakToggle.addEventListener("change", () => {
   if (!speakOn && "speechSynthesis" in window) speechSynthesis.cancel();
 });
 speakPhraseBtn.addEventListener("click", () => {
+  if (!phrase.length) return; // nothing to read; do not fire a silent utterance
   const wasOn = speakOn; speakOn = true; speak(phrase.join(", ")); speakOn = wasOn;
 });
 undoWordBtn.addEventListener("click", () => { phrase.pop(); renderPhrase(); });
@@ -3778,7 +3787,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v61 (2026-08-06)");
+  console.log("AlgoDance build v62 (2026-08-06)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();

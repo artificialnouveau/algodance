@@ -69,14 +69,11 @@
 :root {
   /* Substrate: three weights of paper, warm and slightly different in tone so
      stacked scraps read as separate sheets rather than one flat fill. */
-  --paper:   #E4D9C2;
   --paper-2: #F4EEE0;
   --paper-3: #D2C4A6;
   --ink:     #1C1815;
   --ink-soft:#5F5648;
 
-  --bg: var(--paper);
-  --panel: var(--paper-2);
   --panel-2: #EFE7D5;
   --text: var(--ink);
   --muted: var(--ink-soft);
@@ -93,7 +90,6 @@
   --lift-2: 2px 4px 0 rgba(28,24,21,.16), 8px 16px 34px rgba(20,34,44,.38);
 
   --torn-photo: polygon(0.0% 0.2%, 9.1% 0.2%, 18.2% 1.3%, 27.3% 0.8%, 36.4% 1.1%, 45.5% 0.5%, 54.5% 1.0%, 63.6% 0.1%, 72.7% 1.2%, 81.8% 1.3%, 90.9% 0.2%, 98.9% 0.0%, 98.9% 9.1%, 98.9% 18.2%, 99.9% 27.3%, 98.9% 36.4%, 98.7% 45.5%, 100.0% 54.5%, 99.0% 63.6%, 99.1% 72.7%, 99.1% 81.8%, 99.4% 90.9%, 100.0% 99.1%, 90.9% 100.0%, 81.8% 99.2%, 72.7% 99.7%, 63.6% 99.0%, 54.5% 99.0%, 45.5% 99.2%, 36.4% 99.6%, 27.3% 98.9%, 18.2% 100.0%, 9.1% 99.8%, 0.9% 100.0%, 1.2% 90.9%, 1.0% 81.8%, 0.6% 72.7%, 0.7% 63.6%, 1.0% 54.5%, 1.0% 45.5%, 0.9% 36.4%, 0.9% 27.3%, 0.2% 18.2%, 1.4% 9.1%);
-  --torn-card:  polygon(0.0% 0.4%, 10.0% 0.3%, 20.0% 0.6%, 30.0% 0.8%, 40.0% 0.2%, 50.0% 0.3%, 60.0% 0.7%, 70.0% 0.1%, 80.0% 0.5%, 90.0% 0.4%, 99.6% 0.0%, 100.0% 10.0%, 99.5% 20.0%, 99.8% 30.0%, 100.0% 40.0%, 99.3% 50.0%, 99.8% 60.0%, 99.4% 70.0%, 99.6% 80.0%, 99.9% 90.0%, 100.0% 99.2%, 90.0% 99.8%, 80.0% 100.0%, 70.0% 99.2%, 60.0% 99.7%, 50.0% 99.3%, 40.0% 99.7%, 30.0% 99.5%, 20.0% 99.5%, 10.0% 99.4%, 0.1% 100.0%, 0.2% 90.0%, 0.4% 80.0%, 0.0% 70.0%, 0.6% 60.0%, 0.4% 50.0%, 0.7% 40.0%, 0.3% 30.0%, 0.1% 20.0%, 0.1% 10.0%);
 
   --font-display: "Bodoni Moda", Georgia, serif;
   --font-body: "Archivo", system-ui, sans-serif;
@@ -113,7 +109,6 @@
   --r-md: 10px;
   --r-lg: 14px;
   --r-pill: 999px;
-  --radius: var(--r-lg);
 
   /* One shadow for every floating surface, so they read as the same material. */
   --shadow-card: var(--lift-1);
@@ -132,42 +127,27 @@
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
-  --t: 56px; /* tile pitch */
   color: var(--text);
   font: 15px/1.55 var(--font-body);
   display: flex;
   flex-direction: column;
   /* The wall stays ceramic. Mixed Media does not replace the tiles, it puts
      things ON them: the paper scraps above are flyers taped to a bathroom
-     wall, which is where this material has always actually lived. The tile
-     itself just picks up some grime and grain so it reads as a photographed
-     surface rather than a flat CSS pattern. */
+     wall, which is where this material has always actually lived. */
   background-color: #d5dde3;
   background-image:
-    /* grime in the grout, settling toward the bottom of each tile */
-    repeating-linear-gradient(0deg,
-      rgba(0,0,0,0) 0 calc(var(--t) - 10px),
-      rgba(96,110,120,.16) calc(var(--t) - 10px) var(--t)),
-    /* photographic grain over the whole wall */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='0.42'/%3E%3C/svg%3E"),
-    /* grout lines + the white ceramic highlight on each tile edge */
-    repeating-linear-gradient(90deg,
-      rgba(255,255,255,.75) 0 2px,
-      rgba(255,255,255,0) 2px 4px,
-      rgba(255,255,255,0) calc(var(--t) - 4px),
-      rgba(40,62,78,.34) calc(var(--t) - 4px) var(--t)),
-    repeating-linear-gradient(0deg,
-      rgba(255,255,255,.75) 0 2px,
-      rgba(255,255,255,0) 2px 4px,
-      rgba(255,255,255,0) calc(var(--t) - 4px),
-      rgba(40,62,78,.34) calc(var(--t) - 4px) var(--t)),
-    radial-gradient(130% 120% at 50% 0%, rgba(255,255,255,.18), rgba(10,20,30,.28));
-  background-size:
-    var(--t) var(--t),
-    240px 240px,
-    var(--t) var(--t),
-    var(--t) var(--t),
-    100% 100%;
+    /* Halftone screen: the whole wall is printed, not rendered. */
+    radial-gradient(circle at 50% 50%, rgba(28,40,48,.13) 0 .9px, transparent 1.1px),
+    /* Photographic grain. */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='0.38'/%3E%3C/svg%3E"),
+    /* The tiles themselves, drawn rather than repeated from gradients: every
+       tile a slightly different tone, its own off-centre glaze highlight, the
+       odd hairline crack or stain, and grout that wanders the way hand-laid
+       grout does. Flat CSS gradients were what made this read as a pattern
+       instead of a wall. */
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27224%27%20height%3D%27224%27%20viewBox%3D%270%200%20224%20224%27%3E%3Crect%20x%3D%270%27%20y%3D%270%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E9EEF0%27%2F%3E%3Cellipse%20cx%3D%2728.4%27%20cy%3D%2727.8%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.27%27%2F%3E%3Crect%20x%3D%2756%27%20y%3D%270%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E8EDEF%27%2F%3E%3Cellipse%20cx%3D%2774.6%27%20cy%3D%2717.0%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.25%27%2F%3E%3Crect%20x%3D%27112%27%20y%3D%270%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E8EDEF%27%2F%3E%3Cellipse%20cx%3D%27133.9%27%20cy%3D%2726.6%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.17%27%2F%3E%3Crect%20x%3D%27168%27%20y%3D%270%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23EDF1F2%27%2F%3E%3Cellipse%20cx%3D%27196.8%27%20cy%3D%2718.9%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.33%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%2756%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E2E9EC%27%2F%3E%3Cellipse%20cx%3D%2720.8%27%20cy%3D%2774.4%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.26%27%2F%3E%3Cpath%20d%3D%27M15.1%2064.4%20l5.6%2012.3%20l-3.4%2010.6%20l5.0%209.0%27%20fill%3D%27none%27%20stroke%3D%27%239AA9B2%27%20stroke-width%3D%270.7%27%20opacity%3D%270.5%27%2F%3E%3Crect%20x%3D%2756%27%20y%3D%2756%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E2E9EC%27%2F%3E%3Cellipse%20cx%3D%2783.9%27%20cy%3D%2772.3%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.31%27%2F%3E%3Crect%20x%3D%27112%27%20y%3D%2756%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E8EDEF%27%2F%3E%3Cellipse%20cx%3D%27139.5%27%20cy%3D%2776.0%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.25%27%2F%3E%3Cpath%20d%3D%27M131.0%2064.4%20l5.6%2012.3%20l-3.4%2010.6%20l5.0%209.0%27%20fill%3D%27none%27%20stroke%3D%27%239AA9B2%27%20stroke-width%3D%270.7%27%20opacity%3D%270.5%27%2F%3E%3Crect%20x%3D%27168%27%20y%3D%2756%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E9EEF0%27%2F%3E%3Cellipse%20cx%3D%27196.7%27%20cy%3D%2782.4%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.25%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%27112%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23DCE4E8%27%2F%3E%3Cellipse%20cx%3D%2726.9%27%20cy%3D%27138.7%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.29%27%2F%3E%3Crect%20x%3D%2756%27%20y%3D%27112%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23DCE4E8%27%2F%3E%3Cellipse%20cx%3D%2774.0%27%20cy%3D%27132.0%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.25%27%2F%3E%3Crect%20x%3D%27112%27%20y%3D%27112%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23DCE4E8%27%2F%3E%3Cellipse%20cx%3D%27140.4%27%20cy%3D%27128.0%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.31%27%2F%3E%3Cpath%20d%3D%27M138.9%20120.4%20l5.6%2012.3%20l-3.4%2010.6%20l5.0%209.0%27%20fill%3D%27none%27%20stroke%3D%27%239AA9B2%27%20stroke-width%3D%270.7%27%20opacity%3D%270.5%27%2F%3E%3Crect%20x%3D%27168%27%20y%3D%27112%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23EAF0F1%27%2F%3E%3Cellipse%20cx%3D%27194.6%27%20cy%3D%27132.3%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.30%27%2F%3E%3Cpath%20d%3D%27M186.8%20120.4%20l5.6%2012.3%20l-3.4%2010.6%20l5.0%209.0%27%20fill%3D%27none%27%20stroke%3D%27%239AA9B2%27%20stroke-width%3D%270.7%27%20opacity%3D%270.5%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%27168%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23EDF1F2%27%2F%3E%3Cellipse%20cx%3D%2727.4%27%20cy%3D%27195.0%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.29%27%2F%3E%3Crect%20x%3D%2756%27%20y%3D%27168%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E9EEF0%27%2F%3E%3Cellipse%20cx%3D%2787.4%27%20cy%3D%27188.1%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.25%27%2F%3E%3Cpath%20d%3D%27M81.3%20176.4%20l5.6%2012.3%20l-3.4%2010.6%20l5.0%209.0%27%20fill%3D%27none%27%20stroke%3D%27%239AA9B2%27%20stroke-width%3D%270.7%27%20opacity%3D%270.5%27%2F%3E%3Crect%20x%3D%27112%27%20y%3D%27168%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23E9EEF0%27%2F%3E%3Cellipse%20cx%3D%27135.5%27%20cy%3D%27182.0%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.28%27%2F%3E%3Ccircle%20cx%3D%27149.0%27%20cy%3D%27207.2%27%20r%3D%279.0%27%20fill%3D%27%23B9C6CC%27%20opacity%3D%270.16%27%2F%3E%3Crect%20x%3D%27168%27%20y%3D%27168%27%20width%3D%2756%27%20height%3D%2756%27%20fill%3D%27%23EDF1F2%27%2F%3E%3Cellipse%20cx%3D%27196.3%27%20cy%3D%27188.5%27%20rx%3D%2719.0%27%20ry%3D%2714.6%27%20fill%3D%27%23FFFFFF%27%20opacity%3D%270.18%27%2F%3E%3Cpath%20d%3D%27M0.0%200.0%20L0.0%2028.0%20L0.0%2056.0%20L0.0%2084.0%20L0.0%20112.0%20L0.0%20140.0%20L0.0%20168.0%20L0.0%20196.0%20L0.0%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M0.0%200.0%20L0.0%2028.0%20L0.0%2056.0%20L0.0%2084.0%20L0.0%20112.0%20L0.0%20140.0%20L0.0%20168.0%20L0.0%20196.0%20L0.0%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M0.0%200.0%20L28.0%200.0%20L56.0%200.0%20L84.0%200.0%20L112.0%200.0%20L140.0%200.0%20L168.0%200.0%20L196.0%200.0%20L224.0%200.0%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M0.0%200.0%20L28.0%200.0%20L56.0%200.0%20L84.0%200.0%20L112.0%200.0%20L140.0%200.0%20L168.0%200.0%20L196.0%200.0%20L224.0%200.0%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M55.5%200.0%20L55.2%2028.0%20L55.2%2056.0%20L56.0%2084.0%20L56.0%20112.0%20L56.6%20140.0%20L56.5%20168.0%20L56.2%20196.0%20L55.6%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M55.5%200.0%20L55.2%2028.0%20L55.2%2056.0%20L56.0%2084.0%20L56.0%20112.0%20L56.6%20140.0%20L56.5%20168.0%20L56.2%20196.0%20L55.6%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M0.0%2056.5%20L28.0%2056.2%20L56.0%2056.6%20L84.0%2056.0%20L112.0%2055.9%20L140.0%2056.2%20L168.0%2056.7%20L196.0%2056.7%20L224.0%2056.5%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M0.0%2056.5%20L28.0%2056.2%20L56.0%2056.6%20L84.0%2056.0%20L112.0%2055.9%20L140.0%2056.2%20L168.0%2056.7%20L196.0%2056.7%20L224.0%2056.5%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M111.7%200.0%20L111.4%2028.0%20L111.4%2056.0%20L112.2%2084.0%20L111.6%20112.0%20L112.2%20140.0%20L112.1%20168.0%20L112.2%20196.0%20L111.9%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M111.7%200.0%20L111.4%2028.0%20L111.4%2056.0%20L112.2%2084.0%20L111.6%20112.0%20L112.2%20140.0%20L112.1%20168.0%20L112.2%20196.0%20L111.9%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M0.0%20112.6%20L28.0%20111.7%20L56.0%20112.2%20L84.0%20112.3%20L112.0%20111.6%20L140.0%20111.8%20L168.0%20111.5%20L196.0%20112.7%20L224.0%20111.4%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M0.0%20112.6%20L28.0%20111.7%20L56.0%20112.2%20L84.0%20112.3%20L112.0%20111.6%20L140.0%20111.8%20L168.0%20111.5%20L196.0%20112.7%20L224.0%20111.4%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M168.1%200.0%20L167.2%2028.0%20L167.4%2056.0%20L167.4%2084.0%20L167.6%20112.0%20L168.1%20140.0%20L168.6%20168.0%20L167.7%20196.0%20L167.4%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M168.1%200.0%20L167.2%2028.0%20L167.4%2056.0%20L167.4%2084.0%20L167.6%20112.0%20L168.1%20140.0%20L168.6%20168.0%20L167.7%20196.0%20L167.4%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M0.0%20168.0%20L28.0%20167.6%20L56.0%20167.6%20L84.0%20168.4%20L112.0%20167.6%20L140.0%20167.5%20L168.0%20168.7%20L196.0%20168.4%20L224.0%20168.4%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M0.0%20168.0%20L28.0%20167.6%20L56.0%20167.6%20L84.0%20168.4%20L112.0%20167.6%20L140.0%20167.5%20L168.0%20168.7%20L196.0%20168.4%20L224.0%20168.4%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M224.0%200.0%20L224.0%2028.0%20L224.0%2056.0%20L224.0%2084.0%20L224.0%20112.0%20L224.0%20140.0%20L224.0%20168.0%20L224.0%20196.0%20L224.0%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M224.0%200.0%20L224.0%2028.0%20L224.0%2056.0%20L224.0%2084.0%20L224.0%20112.0%20L224.0%20140.0%20L224.0%20168.0%20L224.0%20196.0%20L224.0%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3Cpath%20d%3D%27M0.0%20224.0%20L28.0%20224.0%20L56.0%20224.0%20L84.0%20224.0%20L112.0%20224.0%20L140.0%20224.0%20L168.0%20224.0%20L196.0%20224.0%20L224.0%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%232C4552%27%20stroke-width%3D%272.4%27%20opacity%3D%270.34%27%2F%3E%3Cpath%20d%3D%27M0.0%20224.0%20L28.0%20224.0%20L56.0%20224.0%20L84.0%20224.0%20L112.0%20224.0%20L140.0%20224.0%20L168.0%20224.0%20L196.0%20224.0%20L224.0%20224.0%27%20fill%3D%27none%27%20stroke%3D%27%2320323C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.22%27%2F%3E%3C%2Fsvg%3E"),
+    radial-gradient(130% 120% at 50% 0%, rgba(255,255,255,.16), rgba(10,20,30,.30));
+  background-size: 4px 4px, 240px 240px, 224px 224px, 100% 100%;
   background-attachment: fixed;
 }
 
