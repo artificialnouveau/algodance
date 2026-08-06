@@ -836,11 +836,10 @@ const ORB_DEFS = [
   { i: 25, rgb: "236,255,0", r: 0.08 }, { i: 26, rgb: "255,0,42", r: 0.08 },
   { i: 27, rgb: "236,255,0", r: 0.11 }, { i: 28, rgb: "255,0,42", r: 0.11 },
 ];
-// The constellation has two looks. The default GLOWS: light-based orbs blended
-// additively, which is a screen effect. Mixed Media PRINTS: a flat disc punched
-// out of paper, a second ink pass a hair off register, and a halftone screen
-// inside it. Same geometry, opposite material.
-const MIXED_MEDIA = document.body.classList.contains("mm");
+// The constellation PRINTS rather than glows: each joint is a flat disc
+// punched out of paper, a second ink pass a hair off register, and a halftone
+// screen inside it. Additive light-based orbs are a screen effect and read as
+// the wrong material next to everything else here.
 const TAU = Math.PI * 2;
 
 // Each joint stamp is rendered ONCE into an offscreen canvas and then blitted
@@ -914,7 +913,7 @@ function drawPresence(lms, now) {
   }
   octx.save();
   // Glow blends additively; ink does not. A printed stroke sits ON the frame.
-  octx.globalCompositeOperation = MIXED_MEDIA ? "source-over" : "lighter";
+  octx.globalCompositeOperation = "source-over";
   octx.lineCap = "round";
   octx.lineJoin = "round";
   const wBase = Math.max(3, sc * 0.12);
@@ -925,25 +924,15 @@ function drawPresence(lms, now) {
       const a = arr[k - 1], b = arr[k];
       if (b.t - a.t > 250) continue; // tracking gap: do not bridge it
       const fade = Math.max(0, 1 - (now - b.t) / TRAIL_MS);
-      if (MIXED_MEDIA) {
-        // A marker stroke: one opaque pass with a dry, uneven edge, plus a
-        // ghost of the second ink pass sitting off register beneath it.
-        const wob = 0.82 + 0.36 * ((k * 2654435761 % 97) / 97);
-        octx.strokeStyle = `rgba(28,24,21,${(0.16 * fade).toFixed(3)})`;
-        octx.lineWidth = wBase * 0.9 * fade * wob + 1.5;
-        octx.beginPath(); octx.moveTo(a.x + 2, a.y + 2); octx.lineTo(b.x + 2, b.y + 2); octx.stroke();
-        octx.strokeStyle = `rgba(${d.rgb},${(0.78 * fade).toFixed(3)})`;
-        octx.lineWidth = wBase * 0.85 * fade * wob + 1;
-        octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
-      } else {
-        // Two passes per segment: a wide soft glow under a bright core.
-        octx.strokeStyle = `rgba(${d.rgb},${(0.1 * fade).toFixed(3)})`;
-        octx.lineWidth = wBase * 2.4 * fade + 2;
-        octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
-        octx.strokeStyle = `rgba(${d.rgb},${(0.5 * fade).toFixed(3)})`;
-        octx.lineWidth = wBase * fade + 1;
-        octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
-      }
+      // A marker stroke: one opaque pass with a dry, uneven edge, plus a
+      // ghost of the second ink pass sitting off register beneath it.
+      const wob = 0.82 + 0.36 * ((k * 2654435761 % 97) / 97);
+      octx.strokeStyle = `rgba(28,24,21,${(0.16 * fade).toFixed(3)})`;
+      octx.lineWidth = wBase * 0.9 * fade * wob + 1.5;
+      octx.beginPath(); octx.moveTo(a.x + 2, a.y + 2); octx.lineTo(b.x + 2, b.y + 2); octx.stroke();
+      octx.strokeStyle = `rgba(${d.rgb},${(0.78 * fade).toFixed(3)})`;
+      octx.lineWidth = wBase * 0.85 * fade * wob + 1;
+      octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
     }
   }
   // The constellation: one mark per joint.
@@ -952,27 +941,16 @@ function drawPresence(lms, now) {
       const p = P(o.i);
       if (!p) continue;
       const r = Math.max(4, sc * o.r);
-      if (MIXED_MEDIA) {
-        // Printed, not lit: the ink pass lands first and a hair off register,
-        // then the punched-out halftone disc on top of it.
-        const off = Math.max(1.5, r * 0.16);
-        octx.globalCompositeOperation = "source-over";
-        octx.fillStyle = `rgba(${o.rgb},0.9)`;
-        octx.beginPath();
-        octx.arc(p.x + off, p.y + off * 0.85, r * 0.82, 0, TAU);
-        octx.fill();
-        const st = inkStamp(o.rgb);
-        octx.drawImage(st, p.x - r * 0.82, p.y - r * 0.82, r * 1.64, r * 1.64);
-        continue;
-      }
-      const g = octx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-      g.addColorStop(0, "rgba(255,255,255,0.9)");
-      g.addColorStop(0.35, `rgba(${o.rgb},0.75)`);
-      g.addColorStop(1, `rgba(${o.rgb},0)`);
-      octx.fillStyle = g;
+      // Printed, not lit: the ink pass lands first and a hair off register,
+      // then the punched-out halftone disc on top of it.
+      const off = Math.max(1.5, r * 0.16);
+      octx.globalCompositeOperation = "source-over";
+      octx.fillStyle = `rgba(${o.rgb},0.9)`;
       octx.beginPath();
-      octx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      octx.arc(p.x + off, p.y + off * 0.85, r * 0.82, 0, TAU);
       octx.fill();
+      const st = inkStamp(o.rgb);
+      octx.drawImage(st, p.x - r * 0.82, p.y - r * 0.82, r * 1.64, r * 1.64);
     }
   }
   octx.restore();
@@ -2044,7 +2022,7 @@ function rebuildMaskLayers() {
     silX.drawImage(hardC, Math.cos(a) * r, Math.sin(a) * r);
   }
 
-  if (MIXED_MEDIA) {
+  {
     // A second ink pass in red, sitting off register behind the figure.
     tintX.globalCompositeOperation = "source-over";
     tintX.clearRect(0, 0, maskW, maskH);
@@ -2088,7 +2066,7 @@ function compositeCutout(now) {
 
   cctx.clearRect(0, 0, W, H);
   const off = Math.max(3, Math.round(W * 0.008));
-  if (MIXED_MEDIA) cctx.drawImage(tintC, off, off * 0.85, W, H);
+  cctx.drawImage(tintC, off, off * 0.85, W, H);
   cctx.drawImage(silC, 0, 0, W, H);   // the black outline
   cctx.drawImage(bodyC, 0, 0);        // the figure on top of it
 }
@@ -3747,7 +3725,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v56 (2026-08-06)");
+  console.log("AlgoDance build v57 (2026-08-06)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();

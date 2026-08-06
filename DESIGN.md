@@ -157,12 +157,45 @@ JSON file is supported for backup and manual sharing today.
 
 ## UI / theme
 
-- Three tabs: **Perform**, **Teach**, **Codes**.
+- Five tabs: **Teach**, **Perform**, **Codes**, **About**, **Zine**.
 - Big webcam stage with skeleton overlay (mirrored, selfie-style); matched word
   animates large over the video; a phrase strip collects matched words.
-- **Look:** bathroom-tile background (white ceramic tiles + grout), with the
-  app content as dark, floating cards. Rainbow gradient wordmark. The bathroom
-  motif nods to queer space; "AlgoDance" as the title.
+- Perform shows only its core (your codes, the match meter, the phrase);
+  routine building and tuning sit behind disclosures.
+
+### Look: mixed media on a tiled wall
+
+The page is a paste-up, not a screen. The wall stays ceramic tile (the bathroom
+motif nods to queer space) and everything else is a scrap of paper taped to it,
+cut and tilted a fraction off square. The livestream is the one photographic
+element, torn-edge clipped and screened with halftone so it belongs to the same
+print run as the page around it.
+
+- **Substrate:** white ceramic tiles with grime in the grout and photographic
+  grain over the whole wall. Paper scraps sit on top with a real cast shadow.
+- **Inks:** riso red `#FF002A` and yellow `#ECFF00`, printed on warm paper
+  rather than glowing on black, plus ballpoint blue `#14417A` for hand-drawn
+  marks. Ink `#1C1815` is the text colour.
+- **Type, three voices:** Bodoni Moda for headlines (cut from a magazine),
+  Courier Prime for labels and marginalia, Archivo for reading.
+- **Joint markers print rather than glow:** each is a disc punched out of
+  paper with a halftone screen inside, a cut ink edge, and a second ink pass
+  a hair off register. Trails are opaque marker strokes, not additive light.
+- Paste-up angles and torn cuts are removed wherever a surface goes full-bleed
+  (phone, kiosk, the zine), because a paper edge stretched edge to edge just
+  leaks gaps at the viewport.
+
+### Background cutout
+
+Opt-in, off by default, toggled under the video so it is reachable from Teach
+as well as Perform. BlazePose emits a person mask from the same inference it
+already runs, so the model cost is an option rather than a second network; the
+compositing is the real cost. Masks feed an exponential average (a raw mask
+boils at the edge) and the composite runs every animation frame off the latest
+one (compositing only on mask arrival makes the body stutter at detection rate
+while the background moves smoothly). A black outline is drawn from a dilated
+silhouette built at mask resolution. Matching never sees any of it; it works on
+landmarks, not pixels.
 
 ---
 
@@ -211,7 +244,8 @@ full-screen performance view, and per-code thresholds.
 - [x] Seated support + manual (hold) trigger for accessibility
 - [x] Ghost playback: click a saved code to replay its skeleton movement
   (reprojected from stored coordinates, no video involved)
+- [x] Full-screen performance/installation view (kiosk mode)
+- [x] Mixed-media visual world; optional background cutout
 - [ ] Optional text-to-speech output per word
-- [ ] Full-screen performance/installation view
 - [ ] Per-code threshold
 - [ ] Shared code library (see [SHARING.md](SHARING.md))

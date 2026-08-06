@@ -1,21 +1,57 @@
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap");
+
+/* ===========================================================================
+   MIXED MEDIA  ·  a paste-up board
+   ---------------------------------------------------------------------------
+   The page is not a screen, it is a sheet. Every surface is a scrap of paper
+   cut out and taped down at a slight angle; the livestream is the one
+   photographic element, torn from somewhere else and pasted on top. The inks
+   stay riso (red + yellow) but they are now printed ON something, so the
+   substrate is warm newsprint rather than a dark UI. A third medium, ballpoint
+   blue, does the hand-drawn marks. Three voices of type: a didone for the
+   headline (cut from a magazine), a grotesque for reading, and a typewriter
+   for everything hand-annotated in the margin.
+   ========================================================================= */
 :root {
-  /* Primary palette: red FF002A, yellow ECFF00, deep red FF001C. */
-  --bg: #140809;
-  --panel: #1c1011;
-  --panel-2: #271617;
-  --text: #fff3f1;
-  --muted: #d1a7a4;
-  --line: #40292b;
-  --accent: #FF002A;   /* red */
-  --accent-2: #FF001C; /* deep red */
+  /* Substrate: three weights of paper, warm and slightly different in tone so
+     stacked scraps read as separate sheets rather than one flat fill. */
+  --paper:   #E4D9C2;
+  --paper-2: #F4EEE0;
+  --paper-3: #D2C4A6;
+  --ink:     #1C1815;
+  --ink-soft:#5F5648;
+
+  --bg: var(--paper);
+  --panel: var(--paper-2);
+  --panel-2: #EFE7D5;
+  --text: var(--ink);
+  --muted: var(--ink-soft);
+  --line: rgba(28,24,21,.28);
+  --accent: #FF002A;   /* red ink */
+  --accent-2: #D40021; /* red, second pass */
   --yellow: #ECFF00;
-  --grad: linear-gradient(90deg, #FF002A, #FF001C, #ECFF00);
+  --blue: #14417A;     /* the ballpoint / photographic layer */
+  --grad: linear-gradient(90deg, #FF002A, #D40021, #ECFF00);
+
+  /* Paper does not glow, it lifts: an offset, a soft blur, and a hairline of
+     contact shadow where the scrap still touches the board. */
+  --lift-1: 1px 2px 0 rgba(28,24,21,.14), 3px 6px 12px rgba(20,34,44,.26);
+  --lift-2: 2px 4px 0 rgba(28,24,21,.16), 8px 16px 34px rgba(20,34,44,.38);
+
+  --torn-photo: polygon(0.0% 0.2%, 9.1% 0.2%, 18.2% 1.3%, 27.3% 0.8%, 36.4% 1.1%, 45.5% 0.5%, 54.5% 1.0%, 63.6% 0.1%, 72.7% 1.2%, 81.8% 1.3%, 90.9% 0.2%, 98.9% 0.0%, 98.9% 9.1%, 98.9% 18.2%, 99.9% 27.3%, 98.9% 36.4%, 98.7% 45.5%, 100.0% 54.5%, 99.0% 63.6%, 99.1% 72.7%, 99.1% 81.8%, 99.4% 90.9%, 100.0% 99.1%, 90.9% 100.0%, 81.8% 99.2%, 72.7% 99.7%, 63.6% 99.0%, 54.5% 99.0%, 45.5% 99.2%, 36.4% 99.6%, 27.3% 98.9%, 18.2% 100.0%, 9.1% 99.8%, 0.9% 100.0%, 1.2% 90.9%, 1.0% 81.8%, 0.6% 72.7%, 0.7% 63.6%, 1.0% 54.5%, 1.0% 45.5%, 0.9% 36.4%, 0.9% 27.3%, 0.2% 18.2%, 1.4% 9.1%);
+  --torn-card:  polygon(0.0% 0.4%, 10.0% 0.3%, 20.0% 0.6%, 30.0% 0.8%, 40.0% 0.2%, 50.0% 0.3%, 60.0% 0.7%, 70.0% 0.1%, 80.0% 0.5%, 90.0% 0.4%, 99.6% 0.0%, 100.0% 10.0%, 99.5% 20.0%, 99.8% 30.0%, 100.0% 40.0%, 99.3% 50.0%, 99.8% 60.0%, 99.4% 70.0%, 99.6% 80.0%, 99.9% 90.0%, 100.0% 99.2%, 90.0% 99.8%, 80.0% 100.0%, 70.0% 99.2%, 60.0% 99.7%, 50.0% 99.3%, 40.0% 99.7%, 30.0% 99.5%, 20.0% 99.5%, 10.0% 99.4%, 0.1% 100.0%, 0.2% 90.0%, 0.4% 80.0%, 0.0% 70.0%, 0.6% 60.0%, 0.4% 50.0%, 0.7% 40.0%, 0.3% 30.0%, 0.1% 20.0%, 0.1% 10.0%);
+
+  --font-display: "Bodoni Moda", Georgia, serif;
+  --font-body: "Archivo", system-ui, sans-serif;
+  --font-hand: "Courier Prime", "Courier New", monospace;
 
   /* Two inks, three jobs. These were all one yellow, which made a warning
      indistinguishable from a success; only --rec keeps the original value. */
-  --ok:   #ECFF00;  /* it worked */
-  --warn: #FF3D57;  /* it did not, and you need to do something */
-  --rec:  #ECFF00;  /* live capture in progress: the countdown pill, REC */
+  /* On paper these have to be legible AS TEXT, so ok is ink-green-black and
+     warn is the red ink; the yellow survives only as a fill behind ink. */
+  --ok:   #1F6B2E;
+  --warn: #C4001F;
+  --rec:  #ECFF00;
 
   /* Radius scale. Every corner in the app is one of these five. */
   --r-xs: 6px;
@@ -26,7 +62,7 @@
   --radius: var(--r-lg);
 
   /* One shadow for every floating surface, so they read as the same material. */
-  --shadow-card: 0 8px 28px rgba(0,0,0,.4);
+  --shadow-card: var(--lift-1);
 
   /* Motion scale. --dur-1 state flips, --dur-2 enter/exit, --dur-3 big moves.
      One easing curve: fast out of the gate, long settle. */
@@ -44,46 +80,108 @@ html, body { margin: 0; height: 100%; }
 body {
   --t: 56px; /* tile pitch */
   color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.55 var(--font-body);
   display: flex;
   flex-direction: column;
-  /* Bathroom ceramic tiles: white highlight + grout line on each cell edge,
-     over a soft vignette. */
-  background-color: #dbe3e8;
+  /* The wall stays ceramic. Mixed Media does not replace the tiles, it puts
+     things ON them: the paper scraps above are flyers taped to a bathroom
+     wall, which is where this material has always actually lived. The tile
+     itself just picks up some grime and grain so it reads as a photographed
+     surface rather than a flat CSS pattern. */
+  background-color: #d5dde3;
   background-image:
-    repeating-linear-gradient(90deg,
-      rgba(255,255,255,.7) 0 2px,
-      rgba(255,255,255,0) 2px 4px,
-      rgba(255,255,255,0) calc(var(--t) - 4px),
-      rgba(40,62,78,.30) calc(var(--t) - 4px) var(--t)),
+    /* grime in the grout, settling toward the bottom of each tile */
     repeating-linear-gradient(0deg,
-      rgba(255,255,255,.7) 0 2px,
+      rgba(0,0,0,0) 0 calc(var(--t) - 10px),
+      rgba(96,110,120,.16) calc(var(--t) - 10px) var(--t)),
+    /* photographic grain over the whole wall */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='0.42'/%3E%3C/svg%3E"),
+    /* grout lines + the white ceramic highlight on each tile edge */
+    repeating-linear-gradient(90deg,
+      rgba(255,255,255,.75) 0 2px,
       rgba(255,255,255,0) 2px 4px,
       rgba(255,255,255,0) calc(var(--t) - 4px),
-      rgba(40,62,78,.30) calc(var(--t) - 4px) var(--t)),
-    radial-gradient(130% 120% at 50% 0%, rgba(255,255,255,.14), rgba(10,20,30,.22));
-  background-size: var(--t) var(--t), var(--t) var(--t), 100% 100%;
+      rgba(40,62,78,.34) calc(var(--t) - 4px) var(--t)),
+    repeating-linear-gradient(0deg,
+      rgba(255,255,255,.75) 0 2px,
+      rgba(255,255,255,0) 2px 4px,
+      rgba(255,255,255,0) calc(var(--t) - 4px),
+      rgba(40,62,78,.34) calc(var(--t) - 4px) var(--t)),
+    radial-gradient(130% 120% at 50% 0%, rgba(255,255,255,.18), rgba(10,20,30,.28));
+  background-size:
+    var(--t) var(--t),
+    240px 240px,
+    var(--t) var(--t),
+    var(--t) var(--t),
+    100% 100%;
   background-attachment: fixed;
 }
 
+/* The masthead scrap: pinned down with two strips of tape, a fraction off
+   square. */
 .topbar {
-  padding: 14px 18px 8px;
+  padding: 16px 20px 12px;
   position: relative;
-  margin: 12px 12px 0;
-  background: rgba(28,15,16,.94);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
+  margin: 22px 14px 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.35), rgba(0,0,0,0)),
+    var(--paper-2);
+  border: none;
+  border-radius: 0;
+  box-shadow: var(--lift-2);
+  transform: rotate(-.35deg);
 }
+.topbar::before,
+.topbar::after {
+  content: "";
+  position: absolute;
+  top: -11px;
+  width: 76px;
+  height: 24px;
+  /* Matte tape: milky, fibrous, torn at both ends. */
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.22) 0 3px, rgba(255,255,255,0) 3px 6px),
+    rgba(240,233,212,.66);
+  border-left: 1px dashed rgba(28,24,21,.18);
+  border-right: 1px dashed rgba(28,24,21,.18);
+  box-shadow: 0 1px 3px rgba(28,24,21,.18);
+  pointer-events: none;
+  z-index: 2;
+}
+.topbar::before { left: 34px; transform: rotate(-4deg); }
+.topbar::after  { right: 46px; transform: rotate(3.5deg); }
+/* Cut from a magazine masthead: a high-contrast didone, each letter set on its
+   own scrap so the baseline staggers the way pasted letters do. */
 .logo {
   margin: 0;
-  font-size: 26px;
-  letter-spacing: -0.5px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: .95;
+  letter-spacing: -0.01em;
   display: inline-block;
-  font-weight: 800;
+  font-weight: 900;
 }
-.logo i { font-style: normal; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
-.tagline { margin: 2px 0 10px; color: var(--muted); font-size: 13px; }
+.logo i {
+  font-style: normal;
+  display: inline-block;
+  color: var(--ink);
+  /* Riso misregistration: the second ink pass lands a hair off. */
+  text-shadow: 2px 2px 0 var(--accent), -1px -1px 0 rgba(236,255,0,.9);
+}
+.logo i:nth-child(2n)  { transform: rotate(-2.5deg) translateY(1px); }
+.logo i:nth-child(3n)  { transform: rotate(2deg) translateY(-2px); }
+.logo i:nth-child(4n)  { transform: rotate(-1deg) translateY(2px); }
+.logo i:nth-child(5n)  { color: var(--accent); text-shadow: 2px 2px 0 var(--ink); }
+/* Marginalia: typed, underlined by hand, sitting slightly off the grid. */
+.tagline {
+  margin: 4px 0 12px;
+  color: var(--ink-soft);
+  font-family: var(--font-hand);
+  font-size: 13px;
+  letter-spacing: .02em;
+  transform: rotate(-.6deg);
+  transform-origin: left center;
+}
 
 /* Horizontal / vertical switch, pinned to the header so it is always
    reachable, especially FROM the rotated mode. */
@@ -98,19 +196,39 @@ body {
 .orient label { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .orient select { width: auto; padding: 6px 10px; font-size: 13px; }
 
-.tabs { display: flex; gap: 6px; }
+.tabs { display: flex; gap: 8px; align-items: flex-end; }
+/* Each tab is its own little card, stuck on at its own angle. */
 .tab {
-  background: transparent;
+  position: relative;
+  background: var(--paper-3);
   border: none;
-  color: var(--muted);
-  padding: 8px 14px;
-  border-radius: var(--r-md) var(--r-md) 0 0;
+  color: var(--ink-soft);
+  padding: 7px 15px;
+  border-radius: 0;
   cursor: pointer;
-  font-size: 14px;
-  border-bottom: 2px solid transparent;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  box-shadow: var(--lift-1);
 }
-.tab:hover { color: var(--text); }
-.tab.is-active { color: var(--text); border-bottom-color: var(--accent); }
+.tab:nth-child(2n) { transform: rotate(1.2deg); }
+.tab:nth-child(3n) { transform: rotate(-1.4deg); }
+.tab:hover { color: var(--ink); background: var(--paper-2); }
+.tab.is-active { color: var(--ink); background: var(--yellow); box-shadow: var(--lift-2); }
+/* Hand-drawn marker stroke under the tab you are on, not a 2px border. */
+.tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 2px; right: 2px; bottom: -9px;
+  height: 10px;
+  /* An actual drawn stroke, twice over and slightly off register, rather than a
+     rounded border pretending to be one. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 12' preserveAspectRatio='none'%3E%3Cpath d='M2 7.5 C 18 4.2, 34 9.4, 52 6.1 S 86 3.4, 118 6.8' fill='none' stroke='%23FF002A' stroke-width='3.2' stroke-linecap='round'/%3E%3Cpath d='M6 10.2 C 24 8.1, 44 11.3, 66 9.2 S 96 7.6, 114 9.9' fill='none' stroke='%23FF002A' stroke-width='1.6' stroke-linecap='round' opacity='0.55'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  transform: rotate(-.8deg);
+}
 
 .layout {
   flex: 1;
@@ -136,11 +254,28 @@ body {
   min-height: 240px;
   aspect-ratio: 16 / 9;
   margin: 0 auto;
-  background: #000;
-  border-radius: var(--radius);
+  background: #12100E;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
+  border: none;
+  box-shadow: var(--lift-2);
+  /* Torn from another page and pasted on: a rough edge all round and a couple
+     of degrees off true. The one photograph in a page of print. */
+  clip-path: var(--torn-photo);
+  transform: rotate(-.8deg);
+}
+/* A halftone screen over the photo, so it belongs to the same print run as the
+   page around it. Under every overlay, which all carry their own z-index. */
+.video-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 50% 50%, rgba(28,24,21,.42) 0 1px, transparent 1.4px);
+  background-size: 5px 5px;
+  mix-blend-mode: multiply;
+  opacity: .45;
 }
 @media (max-width: 900px) {
   .video-wrap { width: 100%; height: auto; }
@@ -277,8 +412,10 @@ body.rot90 .video-wrap { width: 100%; height: auto; max-width: none; }
   gap: 8px;
   padding: 10px 12px;
   margin-bottom: 12px;
-  border: 1px solid #ECFF00;
-  border-radius: var(--r-sm);
+  border: 2px dashed var(--ink);
+  border-radius: 0;
+  background: var(--yellow);
+  font-family: var(--font-hand);
   font-size: 13px;
 }
 
@@ -437,37 +574,43 @@ body.rot90 .video-wrap { width: 100%; height: auto; max-width: none; }
   margin-right: .3em;
   box-shadow: 0 0 24px var(--accent);
 }
-.big-status.saved { color: var(--ok); }
+/* Over the photo, not on paper: keep the bright ink. */
+.big-status.saved { color: var(--yellow); }
 .big-status.count { color: #fff; }
 .big-status.stop { color: var(--rec); }
 @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+/* A yellow scrap with the word stamped on it, taped over the photo. Reads at a
+   distance in a way gradient-filled text never does. */
 .big-word b {
-  background: var(--grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  display: inline-block;
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 900;
+  padding: .06em .3em .12em;
+  transform: rotate(-1.6deg);
+  box-shadow: 3px 4px 0 var(--accent), 5px 8px 18px rgba(0,0,0,.45);
 }
 
 /* Recording state strip below the video (REST / MOVE / REC / 3-2-1). Kept out
    of the stream so the video stays unobstructed. */
 .status-bar {
-  /* Shrink-wrapped and centred under the video: these hold a few words each,
-     and a full-width bar for "Ready." reads as an empty container. */
   width: fit-content;
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(28,15,16,.94);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  background: var(--paper-3);
+  border: none;
+  border-radius: 0;
+  font-family: var(--font-hand);
   padding: 10px 14px;
   box-shadow: var(--shadow-card);
 }
-.status-text { font-size: 15px; color: var(--text); min-height: 22px; }
+.status-text { font-size: 14px; color: var(--ink); min-height: 22px; }
 .pill {
   display: inline-flex;
   align-items: center;
@@ -488,56 +631,76 @@ body.rot90 .video-wrap { width: 100%; height: auto; max-width: none; }
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(28,15,16,.94);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  background: var(--paper-3);
+  border: none;
+  border-radius: 0;
+  font-family: var(--font-hand);
   padding: 8px 14px;
   box-shadow: var(--shadow-card);
 }
 .model-row label { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .model-row select { width: auto; flex: 1; max-width: 420px; }
 
+/* The working sheet: faintly ruled like a notebook, cut on all four edges,
+   tilted the opposite way to the masthead so the stack reads as layers. */
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px;
+  background:
+    repeating-linear-gradient(180deg, rgba(20,65,122,.07) 0 1px, rgba(0,0,0,0) 1px 26px),
+    var(--paper-2);
+  border: none;
+  border-radius: 0;
+  padding: 20px 18px;
   overflow: auto;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--lift-2);
+  transform: rotate(.25deg);
 }
-.tabpane h2 { margin: 0 0 8px; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+/* Section headline, cut from the same magazine as the masthead. */
+.tabpane h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -.015em;
+  color: var(--ink);
+}
 .muted { color: var(--muted); }
-small.muted { font-size: 12px; }
+small.muted { font-size: 12px; font-family: var(--font-hand); line-height: 1.5; display: block; }
 
 .steps { margin: 8px 0; padding-left: 20px; }
 .steps li { margin: 6px 0; }
 .steps b { color: var(--text); }
 
 .field { display: block; margin: 14px 0; }
-.field > span { display: block; font-size: 13px; margin-bottom: 6px; color: var(--text); }
+.field > span { display: block; font-family: var(--font-hand); font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--ink); }
 .field em { color: var(--muted); font-style: normal; }
+/* Fill-in-the-blank on a form, not a rounded input box. */
 input[type="text"] {
   width: 100%;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  color: var(--text);
-  padding: 10px 12px;
-  border-radius: var(--r-md);
-  font-size: 15px;
+  background: rgba(255,255,255,.45);
+  border: none;
+  border-bottom: 2px solid var(--ink);
+  color: var(--ink);
+  padding: 9px 4px;
+  border-radius: 0;
+  font-family: var(--font-hand);
+  font-size: 16px;
 }
+input[type="text"]::placeholder { color: rgba(95,86,72,.75); font-style: italic; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 select {
   width: 100%;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  color: var(--text);
-  padding: 9px 12px;
-  border-radius: var(--r-md);
-  font-size: 14px;
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  padding: 8px 10px;
+  border-radius: 0;
+  font-family: var(--font-hand);
+  font-size: 13px;
 }
 .check {
   display: flex;
@@ -548,7 +711,9 @@ select {
   cursor: pointer;
 }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
-.btn.recording { background: var(--rec); border-color: var(--rec); color: #1a0a12; font-weight: 700; }
+/* Live capture inverts the stamp: ink ground, yellow text. Same 17:1, and
+   unmistakably a different state from the idle button. */
+.btn.recording { background: #12100E; border-color: var(--ink); color: var(--yellow); font-weight: 700; }
 .code-item .count {
   display: inline-block;
   font-size: 11px;
@@ -560,18 +725,22 @@ select {
 }
 
 .btn {
-  border: 1px solid var(--line);
-  background: var(--panel-2);
-  color: var(--text);
-  padding: 9px 14px;
-  border-radius: var(--r-md);
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+  padding: 8px 14px;
+  border-radius: 0;
   cursor: pointer;
-  font-size: 14px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: var(--lift-1);
 }
 .btn { transition: border-color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease); }
-.btn:hover { border-color: var(--accent-2); }
+.btn:hover { background: var(--yellow); border-color: var(--ink); }
 /* Press feedback. Every control the hand can reach acknowledges the press. */
-.btn:active { transform: translateY(1px); }
+/* Pressed = pushed flat onto the board, so the lift shadow goes away. */
+.btn:active { transform: translate(1px, 2px); box-shadow: none; }
 .tab:active { transform: translateY(1px); }
 /* bgBtn, recordBtn and routineStartBtn are all disabled from JS; without this
    a dead button looked identical to a live one. */
@@ -583,15 +752,35 @@ select {
 }
 .btn:disabled:hover,
 .btn[disabled]:hover { border-color: var(--line); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #1a0a12; font-weight: 700; }
+/* Red is a mid-luminance ink: dark text on it measures 4.8:1 but reads muddy,
+   and cream only manages 3.7:1. So the primary action is STAMPED instead of
+   printed on red: yellow ground, ink text (17:1), red kept as the offset the
+   stamp leaves behind. */
+.btn.primary {
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  color: #12100E;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  box-shadow: 3px 3px 0 var(--accent), 5px 6px 14px rgba(28,24,21,.3);
+}
+.btn.primary:hover { background: #F4FF4D; }
+.btn.primary:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--accent); }
 .btn.primary:hover { filter: brightness(1.05); }
-.btn.primary.recording { background: var(--rec); border-color: var(--rec); }
+.btn.primary.recording {
+  background: #12100E;
+  border-color: var(--ink);
+  color: var(--yellow);
+  box-shadow: 3px 3px 0 var(--accent), 5px 6px 14px rgba(28,24,21,.3);
+}
 .btn.block { width: 100%; }
 .btn.small { padding: 6px 10px; font-size: 13px; }
-.btn.ghost { background: transparent; }
-.btn.danger { color: var(--warn); border-color: #5a1f28; }
+.btn.ghost { background: transparent; box-shadow: none; border-style: dashed; }
+.btn.danger { color: var(--warn); border-color: var(--ink); }
 
-.meter { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 12px; margin: 12px 0; }
+.meter { background: var(--paper-3); border: 1.5px solid var(--ink); border-radius: 0; padding: 12px; margin: 14px 0; box-shadow: var(--lift-1); }
+.meter-row span { font-family: var(--font-hand); }
 .meter-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
 .meter-row b { color: var(--text); }
 .bar { height: 8px; background: #000; border-radius: var(--r-xs); overflow: hidden; margin-top: 8px; }
@@ -609,36 +798,46 @@ select {
 .transcript-head { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
 .transcript-head h3 { margin: 0; }
 .phrase {
-  margin-top: 8px;
-  min-height: 60px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  margin-top: 10px;
+  min-height: 62px;
+  background: rgba(255,255,255,.42);
+  border: 1.5px dashed var(--ink);
+  border-radius: 0;
   padding: 12px;
   font-size: 18px;
-  line-height: 1.7;
+  line-height: 1.9;
 }
 .phrase .chip {
   display: inline-block;
-  background: rgba(236,255,0,.14);
-  border: 1px solid var(--accent);
-  border-radius: var(--r-sm);
-  padding: 2px 8px;
-  margin: 0 4px 4px 0;
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  padding: 2px 9px;
+  margin: 0 5px 6px 0;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  box-shadow: var(--lift-1);
 }
+.phrase .chip:nth-child(2n) { transform: rotate(-1.6deg); }
+.phrase .chip:nth-child(3n) { transform: rotate(1.4deg); }
 
 .teach-msg { min-height: 20px; margin-top: 10px; }
-.teach-msg.ok { color: var(--ok); }
-.teach-msg.warn { color: var(--warn); }
+.teach-msg.ok { color: var(--ok); font-family: var(--font-hand); font-weight: 700; }
+.teach-msg.warn { color: var(--warn); font-family: var(--font-hand); font-weight: 700; }
 
 .code-list { list-style: none; margin: 8px 0; padding: 0; }
+/* Every saved code is its own pasted card, alternating lean down the stack. */
 .code-item {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  padding: 11px 13px;
+  margin-bottom: 12px;
+  box-shadow: var(--lift-1);
 }
+.code-item:nth-child(2n) { transform: rotate(-.5deg); }
+.code-item:nth-child(3n) { transform: rotate(.45deg); }
+.code-item .word { font-family: var(--font-display); font-size: 19px; font-weight: 800; }
 .code-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px;
@@ -665,9 +864,10 @@ select {
 }
 /* Family badges stay inside the two-ink palette: yellow is the algorithm you
    are running, muted outline is one you are not (including retired YOLO). */
-.fam-blaze { background: rgba(236,255,0,.16); color: var(--yellow); }
-.fam-movenet { background: rgba(255,0,42,.18); color: #ff8f9d; }
-.fam-yolo { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+/* Rubber-stamped on the card: ink on a tinted block. */
+.fam-blaze { background: var(--yellow); color: var(--ink); border: 1px solid var(--ink); }
+.fam-movenet { background: transparent; color: var(--ink); border: 1.5px solid var(--accent); }
+.fam-yolo { background: transparent; color: var(--ink-soft); border: 1px dashed var(--ink-soft); }
 
 /* Keyboard focus: a clear ring on interactive elements (mouse clicks don't
    trigger :focus-visible, so this only shows for keyboard users). */
@@ -676,7 +876,7 @@ select {
 select:focus-visible,
 input:focus-visible,
 .check:focus-within {
-  outline: 3px solid var(--yellow);
+  outline: 3px solid var(--blue);
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }
@@ -715,7 +915,19 @@ input:focus-visible,
 .about-list b { color: var(--text); }
 /* One h3 for every section label in the panel: same size, same weight, and
    more space above than below so it binds to what follows. */
-.tabpane h3 { margin: 20px 0 6px; font-size: 15px; font-weight: 700; }
+/* Typed section label with a ruled line under it, the way a paste-up is
+   annotated. */
+.tabpane h3 {
+  margin: 22px 0 8px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 3px;
+}
 
 .pdf-frame {
   width: 100%;
@@ -823,9 +1035,11 @@ body.header-collapsed .zine { min-height: 100vh; }
   z-index: 60;
   padding: 6px 14px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--line);
-  background: rgba(20,8,9,.9);
-  color: var(--text);
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--font-hand);
+  font-weight: 700;
   font-size: 13px;
   cursor: pointer;
 }
@@ -905,7 +1119,8 @@ body.header-collapsed .zine { min-height: 100vh; }
   font-size: 14px;
   opacity: .8;
 }
-a { color: var(--yellow); }
+a { color: var(--blue); text-underline-offset: 3px; }
+a:hover { color: var(--accent); }
 
 /* Perform: match diagnosis log */
 .diag { margin-top: 14px; }
@@ -931,15 +1146,20 @@ a { color: var(--yellow); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-btn {
-  background: rgba(236,255,0,.14);
-  border: 1px solid var(--accent);
-  color: var(--text);
-  border-radius: var(--r-sm);
-  padding: 4px 10px;
-  font-size: 14px;
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  border-radius: 0;
+  padding: 4px 11px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--lift-1);
 }
-.chip-btn:hover { background: rgba(236,255,0,.24); }
+.chip-btn:nth-child(2n) { transform: rotate(1.1deg); }
+.chip-btn:nth-child(3n) { transform: rotate(-1.3deg); }
+.chip-btn:hover { background: var(--yellow); }
 
 /* Closest-guess hint on the video */
 .closest-hint {
@@ -954,6 +1174,7 @@ a { color: var(--yellow); }
   pointer-events: none;
 }
 
+/* First-run framing hint */
 /* A post-it stuck next to the screen, not a label pasted over the performer.
    Lives in the stage above the video so it never covers anyone. */
 .intro-hint {
@@ -976,7 +1197,11 @@ a { color: var(--yellow); }
 .intro-hint p { margin: 0; font-size: 15px; line-height: 1.5; color: #2E2A18; }
 .intro-hint b { color: #B3001B; }
 .intro-hint .btn { margin-top: 13px; }
-
+/* Handwritten on the pad, in the collage world. */
+.intro-hint p { font-family: var(--font-hand); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .intro-hint { transform: none; } }
+.intro-hint b { color: var(--accent); }
+.intro-hint .btn { flex-shrink: 0; }
 
 /* Reading pages (About / AlgoDance): hide the video stage, panel fills width. */
 .layout.content-full { grid-template-columns: 1fr; }
@@ -999,19 +1224,82 @@ body.rot90 {
    stack the panel underneath instead of squeezing them side by side. */
 body.rot90 .layout { grid-template-columns: 1fr; }
 
-/* Teach: the instruction sits directly above the field it refers to. */
-.teach-hint {
-  margin: 14px 0 4px;
-  padding: 9px 12px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  font-size: 14px;
-}
-.teach-hint b { color: var(--yellow); }
 
-/* Background cutout: the masked body sits exactly where the video does and
-   replaces it, so the skeleton overlay above still lines up pixel for pixel. */
+/* ===========================================================================
+   Collage furniture and substrate corrections
+   ========================================================================= */
+
+/* Printer's crop marks and a registration target: the marks a paste-up leaves
+   behind. Fixed to the board, never in the way. */
+.mm-marks { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+.mm-marks .cm {
+  position: absolute;
+  width: 26px; height: 26px;
+  border: 0 solid rgba(28,24,21,.42);
+}
+.mm-marks .cm.tl { top: 8px;    left: 8px;    border-top-width: 1px; border-left-width: 1px; }
+.mm-marks .cm.tr { top: 8px;    right: 8px;   border-top-width: 1px; border-right-width: 1px; }
+.mm-marks .cm.bl { bottom: 8px; left: 8px;    border-bottom-width: 1px; border-left-width: 1px; }
+.mm-marks .cm.br { bottom: 8px; right: 8px;   border-bottom-width: 1px; border-right-width: 1px; }
+.mm-marks .reg {
+  position: absolute;
+  right: 16px; bottom: 40px;
+  width: 30px; height: 30px;
+  opacity: .45;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+@media (max-width: 900px) { .mm-marks { display: none; } }
+
+/* A paper edge does not survive being stretched full-bleed: wherever a surface
+   goes edge to edge (phone layout, kiosk, the zine) the tilt and the torn cut
+   are removed rather than left to leak gaps at the viewport edge. */
+@media (max-width: 900px) {
+  .topbar,
+  .panel,
+  .video-wrap { transform: none; clip-path: none; box-shadow: none; }
+  .topbar::before, .topbar::after { display: none; }
+  .topbar { background: rgba(244,238,224,.94); backdrop-filter: blur(8px); }
+  .panel { background: var(--paper-2); }
+  .status-bar, .model-row { background: rgba(210,196,166,.92); }
+}
+body.kiosk .video-wrap,
+.layout.pdf-full .panel,
+.layout.content-full .panel { transform: none; clip-path: none; }
+body.kiosk .video-wrap { box-shadow: none; }
+body.kiosk .video-wrap::after { display: none; }
+
+/* The zine keeps its dark reading room: it is a document, not part of the
+   board, so the paper tokens must not bleed into it. */
+.layout.pdf-full .panel { background: #0d0d0f; box-shadow: none; }
+
+/* Reduced motion never asked for the paste-up angles either. */
+@media (prefers-reduced-motion: reduce) {
+  .topbar, .panel, .video-wrap, .tab, .code-item,
+  .phrase .chip, .chip-btn, .big-word b, .intro-hint, .tagline,
+  .logo i { transform: none; }
+}
+
+/* Teach: the instruction sits directly above the field it refers to, typed on
+   a scrap of tape rather than boxed. */
+.teach-hint {
+  margin: 16px 0 6px;
+  padding: 9px 12px;
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  font-family: var(--font-hand);
+  font-size: 13px;
+  box-shadow: var(--lift-1);
+  transform: rotate(-.4deg);
+}
+.teach-hint b { font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .teach-hint { transform: none; } }
+
+/* Background cutout: with the background gone the body is a photographic
+   figure cut out and laid straight onto the page, which is the whole collage
+   move. So the ground behind it becomes paper, not black. */
 #cutout {
   position: absolute;
   inset: 0;
@@ -1021,12 +1309,18 @@ body.rot90 .layout { grid-template-columns: 1fr; }
   transform: scaleX(-1);
   display: none;
   pointer-events: none;
+  z-index: 0;
 }
 body.cutout #cutout { display: block; }
-/* The video keeps playing (the model still reads frames from it), it just
-   stops painting. */
 body.cutout #video { visibility: hidden; }
-body.cutout .video-wrap { background: #0b0a0c; }
+body.cutout .video-wrap {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(28,24,21,.16) 0 .9px, transparent 1.1px),
+    linear-gradient(180deg, #F4EEE0, #DCCFB2);
+  background-size: 4px 4px, 100% 100%;
+}
+/* The halftone screen belongs to the photograph, not to the paper behind it. */
+body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
 
 @media (max-width: 900px) {
   /* Pinned by left/right on phones, so the desktop shrink-wrap must not apply. */
@@ -1043,25 +1337,22 @@ body.cutout .video-wrap { background: #0b0a0c; }
   }
 }
 
-/* The cutout toggle rides in the row under the video, so it is reachable from
-   Teach as well as Perform. */
-.check.inline { margin: 0; font-size: 13px; white-space: nowrap; }
+/* The cutout toggle rides in the row under the video, reachable from Teach. */
+.check.inline { margin: 0; font-family: var(--font-hand); font-size: 12px; white-space: nowrap; }
 .check.inline input { width: 15px; height: 15px; }
 
-/* Perform had fifteen stacked blocks. Everything past the core three (your
-   codes, is it matching, the phrase) now sits behind one of these. */
+/* Disclosures: typed section tabs, same voice as the h3 labels. */
 .more { margin: 16px 0 0; }
 .more > summary {
   cursor: pointer;
-  font-size: 15px;
+  font-family: var(--font-hand);
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
   padding: 8px 0;
-  border-top: 1px solid var(--line);
+  border-top: 1.5px solid var(--ink);
   list-style: revert;
 }
 .more > summary:hover { color: var(--accent); }
 .more[open] > summary { margin-bottom: 4px; }
-
-/* A black outline is invisible on a black field: with the background cut away
-   the figure needs a light ground to be cut OUT of. */
-body.cutout .video-wrap { background: #E7E2D8; }
