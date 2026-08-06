@@ -66,6 +66,16 @@ const threshVal = document.getElementById("threshVal");
 const bestWordEl = document.getElementById("bestWord");
 const matchPctEl = document.getElementById("matchPct");
 const barEl = document.getElementById("bar");
+// The match bar is redrawn on every detection frame. Writing `width` relayouts
+// the whole panel each time (and restarts a transition that never finishes), so
+// the fill is a composited scaleX driven by one custom property instead.
+let barPct = -1;
+function setBar(pct) {
+  const v = Math.max(0, Math.min(100, pct));
+  if (Math.abs(v - barPct) < 0.5) return; // skip sub-pixel rewrites
+  barPct = v;
+  barEl.style.setProperty("--fill", (v / 100).toFixed(3));
+}
 const performListEl = document.getElementById("performList");
 const closestHintEl = document.getElementById("closestHint");
 const introHint = document.getElementById("introHint");
@@ -526,20 +536,20 @@ function saveTemplates() {
 function newId() { return "c_" + Math.random().toString(36).slice(2, 9) + performance.now().toString(36); }
 
 // ---------- Pose algorithms ----------
-// Three genuinely different algorithms, all producing the same 33-slot pose
-// (see backends.js). BlazePose keeps 33 native points; MoveNet and YOLO give
-// 17, mapped into the same slots. Codes are tagged with the algorithm FAMILY
-// and only matched within their family, since the three do not agree on scale.
+// Two genuinely different algorithms, both producing the same 33-slot pose
+// (see backends.js). BlazePose keeps 33 native points; MoveNet gives 17,
+// mapped into the same slots. Codes are tagged with the algorithm FAMILY and
+// only matched within their family, since the two do not agree on scale.
 const ALGOS = {
   "blaze-lite":       { family: "blaze",   label: "MediaPipe BlazePose Lite" },
   "blaze-full":       { family: "blaze",   label: "MediaPipe BlazePose Full" },
   "blaze-heavy":      { family: "blaze",   label: "MediaPipe BlazePose Heavy" },
   "movenet-lightning":{ family: "movenet", label: "MoveNet Lightning (TF.js)" },
   "movenet-thunder":  { family: "movenet", label: "MoveNet Thunder (TF.js)" },
-  "yolo":             { family: "yolo",    label: "YOLO-Pose (ONNX Runtime Web)" },
 };
 const ALGO_STORE_KEY = "algodance.algo.v1";
-const YOLO_URL_KEY = "algodance.yoloModelUrl";
+// YOLO-Pose was removed; drop the model URL anyone pasted in for it.
+try { localStorage.removeItem("algodance.yoloModelUrl"); } catch {}
 let algoChoice = localStorage.getItem(ALGO_STORE_KEY);
 if (!ALGOS[algoChoice]) algoChoice = "blaze-full";
 let currentFamily = ALGOS[algoChoice].family;
@@ -547,7 +557,7 @@ let currentFamily = ALGOS[algoChoice].family;
 function connectionsForFamily(fam) { return fam === "blaze" ? BLAZE_CONNECTIONS : COCO_CONNECTIONS; }
 
 async function initPose() {
-  backend = createBackend(algoChoice, { yoloModelUrl: localStorage.getItem(YOLO_URL_KEY) || "" });
+  backend = createBackend(algoChoice);
   await backend.load();
   currentFamily = backend.family;
   recomputeWordStats(); // thresholds are per-family
@@ -556,19 +566,10 @@ async function initPose() {
 }
 
 // Swap algorithm at runtime. Detection is paused (ready=false) during the
-// load, so the video keeps playing. A failure (bad CDN, missing YOLO model)
+// load, so the video keeps playing. A failure (an unreachable CDN, say)
 // reverts to the previous algorithm instead of leaving the app dead.
 async function switchAlgo(key) {
   if (!ALGOS[key] || key === algoChoice) return;
-  // YOLO needs a model file; ask for a URL the first time if none is stored.
-  if (key === "yolo" && !localStorage.getItem(YOLO_URL_KEY)) {
-    const url = prompt(
-      "YOLO-Pose needs a YOLOv8/YOLO11-pose model exported to ONNX (640x640).\n" +
-      "Paste a URL to the .onnx file (CORS-enabled), or Cancel to keep the current algorithm.\n" +
-      "See the README for how to export one.", "");
-    if (!url || !url.trim()) { modelSel.value = algoChoice; return; }
-    localStorage.setItem(YOLO_URL_KEY, url.trim());
-  }
   const prev = algoChoice;
   algoChoice = key;
   localStorage.setItem(ALGO_STORE_KEY, key);
@@ -589,7 +590,6 @@ async function switchAlgo(key) {
     algoChoice = prev;
     localStorage.setItem(ALGO_STORE_KEY, prev);
     modelSel.value = prev;
-    if (key === "yolo") localStorage.removeItem(YOLO_URL_KEY); // let them re-enter a URL
     try { await initPose(); ready = true; setPerformState(); } catch (e2) { console.error(e2); }
   }
 }
@@ -1076,7 +1076,7 @@ function smoothPose(lms, now) {
 }
 
 // ---------- Main loop ----------
-// Async because MoveNet and YOLO detect asynchronously; `inflight` keeps frames
+// Async because MoveNet detects asynchronously; `inflight` keeps frames
 // from overlapping. Detection is throttled to ~30fps, which is plenty for
 // gesture capture and roughly halves GPU/battery load versus running every
 // animation frame.
@@ -1176,7 +1176,7 @@ async function runFrame() {
             stillSince = 0;
             if (!perfHandsLost) {
               perfHandsLost = true;
-              barEl.style.width = "0%";
+              setBar(0);
               hideClosest();
             }
             statusEl.textContent = "Can't see your hands. Keep at least one hand in view; matching is paused.";
@@ -1205,11 +1205,16 @@ async function runFrame() {
 
       // Keep the matched word floating just above the head. The video is
       // mirrored, so x flips; y is clamped so the word stays inside the frame.
+      // The anchor is tracked every frame but only WRITTEN while the word is on
+      // screen: left/top are layout-triggering, and off screen they were moving
+      // an invisible element 60 times a second. showBigWord() applies the last
+      // known anchor as it appears, so it never flashes at a stale position.
       const nose = lms[0];
       if (nose) {
         const topY = Math.max(0.14, Math.min(...FACE_LMS.map((i) => lms[i]?.y ?? 1)) - 0.05);
-        bigWord.style.left = ((1 - nose.x) * 100).toFixed(1) + "%";
-        bigWord.style.top = (topY * 100).toFixed(1) + "%";
+        headAnchor.x = (1 - nose.x) * 100;
+        headAnchor.y = topY * 100;
+        if (bigWord.classList.contains("show")) placeBigWord();
       }
     }
 
@@ -1511,7 +1516,7 @@ function showScore(ranked) {
   const pct = Math.max(0, Math.min(100, (1 - best.dist / thresh) * 100));
   bestWordEl.textContent = best.word;
   matchPctEl.textContent = Math.round(pct) + "%";
-  barEl.style.width = pct + "%";
+  setBar(pct);
   if (pct >= 25) showClosest(best.word, pct); else hideClosest();
   return { best, second, thresh };
 }
@@ -1561,7 +1566,7 @@ function holdStep(vec, now, face, conf) {
   const pct = Math.max(0, Math.min(100, (1 - best.dist / thresh) * 100));
   bestWordEl.textContent = best.word;
   matchPctEl.textContent = Math.round(pct) + "%";
-  barEl.style.width = pct + "%";
+  setBar(pct);
   if (pct >= 25) showClosest(best.word, pct);
   const ambiguous = second && (second.dist - best.dist) < AMBIG_GAP_FRAC * thresh;
   // The held pose must resemble the word MORE than the user's own calibrated
@@ -1608,7 +1613,7 @@ function performStep(vec, now, face, conf) {
     if (sp > MOVE_START) {
       moving = true; moveStart = now - SPEED_WIN_MS; lastActive = now;
     } else if (!holding) {
-      barEl.style.width = "0%";
+      setBar(0);
       hideClosest();
     }
     return;
@@ -1628,7 +1633,7 @@ function performStep(vec, now, face, conf) {
     const inProgress = scoreSegment(soFar);
     if (inProgress) showScore(inProgress);
   } else if (!holding) {
-    barEl.style.width = "0%";
+    setBar(0);
     hideClosest();
   }
 
@@ -1647,7 +1652,7 @@ function performStep(vec, now, face, conf) {
     fs.tailOn || fs.frac > 0.3 ? "reads as a hand-to-face rest gesture" : null;
   if (gate) {
     diag(`move rejected: ${gate}`);
-    barEl.style.width = "0%"; hideClosest(); return;
+    setBar(0); hideClosest(); return;
   }
   let ranked = scoreSegment(segFrames, confInRange(moveStart, lastActive));
   let chosen = segFrames;
@@ -1682,7 +1687,7 @@ function performStep(vec, now, face, conf) {
   }
   if (!ranked) {
     diag("move rejected: no code with comparable energy/excursion");
-    barEl.style.width = "0%"; hideClosest(); return;
+    setBar(0); hideClosest(); return;
   }
   const { best, second, thresh } = showScore(ranked);
   const ambiguous = second && (second.dist - best.dist) < AMBIG_GAP_FRAC * thresh;
@@ -1848,7 +1853,7 @@ function matchAndFire(frames, now) {
   if (perWord.size === 0) {
     bestWordEl.textContent = "—";
     matchPctEl.textContent = "—";
-    barEl.style.width = "0%";
+    setBar(0);
     return;
   }
   const ranked = [...perWord.values()].sort((a, b) => a.dist - b.dist);
@@ -1858,7 +1863,7 @@ function matchAndFire(frames, now) {
   const pct = isFinite(best.dist) ? Math.max(0, Math.min(100, (1 - best.dist / thresh) * 100)) : 0;
   bestWordEl.textContent = best.word ?? "—";
   matchPctEl.textContent = Math.round(pct) + "%";
-  barEl.style.width = pct + "%";
+  setBar(pct);
 
   // Ambiguous when a different word is nearly as close: skip rather than guess.
   const ambiguous = second && (second.dist - best.dist) < AMBIG_GAP_FRAC * thresh;
@@ -1962,9 +1967,18 @@ function stopManual() {
   if (frames.length >= MIN_SEG_FRAMES) matchAndFire(frames, performance.now());
 }
 
+// Last known head position, in percent of the video box. Updated every tracked
+// frame; only pushed to the DOM while the word is visible.
+const headAnchor = { x: 50, y: 20 };
+function placeBigWord() {
+  bigWord.style.left = headAnchor.x.toFixed(1) + "%";
+  bigWord.style.top = headAnchor.y.toFixed(1) + "%";
+}
+
 let bigWordTimer = null;
 function showBigWord(word) {
   bigWord.innerHTML = `<b>${escapeHtml(word)}</b>`;
+  placeBigWord();
   bigWord.classList.add("show");
   clearTimeout(bigWordTimer);
   bigWordTimer = setTimeout(() => bigWord.classList.remove("show"), 1200);
@@ -3024,7 +3038,9 @@ function renderCodeList() {
   }
 }
 
-const FAM_LABEL = { blaze: "BlazePose", movenet: "MoveNet", yolo: "YOLO" };
+// "yolo" is retired but still labelled: codes taught under it are kept, shown,
+// and exportable, they just cannot be matched without that algorithm.
+const FAM_LABEL = { blaze: "BlazePose", movenet: "MoveNet", yolo: "YOLO (retired)" };
 
 // Perform tab: the words you can currently perform (this algorithm family),
 // as chips that preview the ghost. Empty state nudges to Teach, and notes when
@@ -3375,7 +3391,7 @@ function activateTab(tab, focus = false) {
   manualCapturing = false;
   moving = false; // drop any half-finished Perform move
   hideClosest();
-  barEl.style.width = "0%";
+  setBar(0);
   updatePbControls(); // the practice strip only shows on Perform
   // First Perform visit each session: offer a warm-up run of your codes.
   if (name === "perform" && !warmupOffered) {
@@ -3475,7 +3491,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v51 (2026-08-06)");
+  console.log("AlgoDance build v52 (2026-08-06)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();

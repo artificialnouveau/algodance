@@ -1,7 +1,7 @@
 // Pose-estimation backends. Each backend exposes the SAME interface so the app
 // never cares which algorithm is running:
 //
-//   backend.family                 "blaze" | "movenet" | "yolo"
+//   backend.family                 "blaze" | "movenet"
 //   backend.connections            [[i,j], ...] slot pairs to draw as bones
 //   await backend.load()           fetch weights / build the session
 //   await backend.detect(video,ts) -> array of poses; each pose is a 33-slot
@@ -11,15 +11,15 @@
 //
 // Every backend outputs the SAME 33-slot layout as MediaPipe BlazePose, so the
 // rest of the pipeline (normalization, rest detection, matching, drawing) is
-// identical regardless of algorithm. 17-keypoint models (MoveNet, YOLO) fill
-// only the slots they have; the unused slots stay at visibility 0. Because a
-// code is only ever matched against codes from the SAME family, the constant
-// empty slots do not affect recognition.
+// identical regardless of algorithm. 17-keypoint models (MoveNet) fill only the
+// slots they have; the unused slots stay at visibility 0. Because a code is
+// only ever matched against codes from the SAME family, the constant empty
+// slots do not affect recognition.
 //
 // Only BlazePose is imported statically (it is the default and must always
-// work). MoveNet and YOLO are loaded with dynamic import() the first time they
-// are selected, so a CDN or model failure disables just that algorithm instead
-// of breaking the whole app.
+// work). MoveNet is loaded with dynamic import() the first time it is
+// selected, so a CDN failure disables just that algorithm instead of breaking
+// the whole app.
 
 import {
   PoseLandmarker,
@@ -119,88 +119,8 @@ class MoveNetBackend {
   close() { try { this.detector?.dispose(); } catch {} }
 }
 
-// ---------- YOLO-Pose (ONNX Runtime Web + WebGPU) ----------
-// Expects a YOLOv8/YOLO11-pose model exported to ONNX at 640x640. Because there
-// is no universal public URL for such a file, the URL is supplied by the app
-// (a constant or a value the user pastes) and passed into the constructor.
-class YoloBackend {
-  constructor(key, modelUrl) {
-    this.key = key; this.family = "yolo"; this.connections = COCO_CONNECTIONS;
-    this.modelUrl = modelUrl; this.session = null; this.ort = null;
-    this.size = 640;
-    this.canvas = document.createElement("canvas");
-    this.canvas.width = this.size; this.canvas.height = this.size;
-    this.cctx = this.canvas.getContext("2d", { willReadFrequently: true });
-  }
-  async load() {
-    if (!this.modelUrl) throw new Error("no YOLO model URL configured");
-    this.ort = await import("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.webgpu.bundle.min.mjs");
-    this.ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/";
-    this.session = await this.ort.InferenceSession.create(this.modelUrl, {
-      executionProviders: ["webgpu", "wasm"],
-    });
-  }
-  // Letterbox the frame into a 640x640 RGB CHW float tensor.
-  _preprocess(video) {
-    const W = video.videoWidth, H = video.videoHeight, S = this.size;
-    const scale = Math.min(S / W, S / H);
-    const nw = Math.round(W * scale), nh = Math.round(H * scale);
-    const padX = (S - nw) / 2, padY = (S - nh) / 2;
-    this.cctx.fillStyle = "rgb(114,114,114)";
-    this.cctx.fillRect(0, 0, S, S);
-    this.cctx.drawImage(video, padX, padY, nw, nh);
-    const data = this.cctx.getImageData(0, 0, S, S).data;
-    const chw = new Float32Array(3 * S * S);
-    const plane = S * S;
-    for (let i = 0; i < plane; i++) {
-      chw[i] = data[i * 4] / 255;               // R
-      chw[i + plane] = data[i * 4 + 1] / 255;   // G
-      chw[i + 2 * plane] = data[i * 4 + 2] / 255; // B
-    }
-    return { tensor: new this.ort.Tensor("float32", chw, [1, 3, S, S]), scale, padX, padY, W, H };
-  }
-  async detect(video) {
-    if (!this.session) return [];
-    const pre = this._preprocess(video);
-    const feeds = {}; feeds[this.session.inputNames[0]] = pre.tensor;
-    const out = await this.session.run(feeds);
-    const o = out[this.session.outputNames[0]];
-    const dims = o.dims, d = o.data;
-    // Accept [1,56,N] or [1,N,56]; C=56 is 4 box + 1 conf + 17*3 kpts.
-    let C, N, colMajor;
-    if (dims[1] === 56) { C = dims[1]; N = dims[2]; colMajor = true; }
-    else { N = dims[1]; C = dims[2]; colMajor = false; }
-    const at = (row, col) => colMajor ? d[col * N + row] : d[row * C + col];
-    let bestI = -1, bestConf = 0.25;
-    for (let i = 0; i < N; i++) {
-      const conf = at(i, 4);
-      if (conf > bestConf) { bestConf = conf; bestI = i; }
-    }
-    if (bestI < 0) return [];
-    const kpts = [];
-    for (let k = 0; k < 17; k++) {
-      const px = at(bestI, 5 + k * 3);
-      const py = at(bestI, 5 + k * 3 + 1);
-      const ps = at(bestI, 5 + k * 3 + 2);
-      const x = (px - pre.padX) / pre.scale / pre.W;
-      const y = (py - pre.padY) / pre.scale / pre.H;
-      kpts.push({ x, y, score: ps });
-    }
-    return [cocoToPose(kpts)];
-  }
-  close() { try { this.session?.release?.(); } catch {} }
-}
-
-// Factory. `opts.yoloModelUrl` is only needed for the yolo family.
-export function createBackend(key, opts = {}) {
+export function createBackend(key) {
   if (key.startsWith("blaze")) return new BlazeBackend(key);
   if (key.startsWith("movenet")) return new MoveNetBackend(key);
-  if (key === "yolo") return new YoloBackend(key, opts.yoloModelUrl);
   throw new Error("unknown algorithm: " + key);
-}
-
-export function familyOf(key) {
-  if (key.startsWith("movenet")) return "movenet";
-  if (key === "yolo") return "yolo";
-  return "blaze";
 }

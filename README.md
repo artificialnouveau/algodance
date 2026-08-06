@@ -9,26 +9,24 @@ browser; only pose **coordinates** are stored, never webcam video.
 
 ## What the code does
 
-The whole app is three static files (`index.html`, `style.css`, `app.js`) with
-no build step. `app.js` does all the work:
+The whole app is four static files (`index.html`, `style.css`, `app.js`,
+`backends.js`) with no build step. `app.js` does all the work:
 
 1. **Pose tracking.** Each video frame goes through a pose-estimation model
    running entirely in the browser. A picker under the video chooses between
-   three genuinely different algorithms (see `backends.js`):
+   two genuinely different algorithms (see `backends.js`):
    - **MediaPipe BlazePose** (Lite / Full / Heavy): 33 landmarks, the default
      and the best all-round single-dancer accuracy in the browser. Full is
      recommended; Heavy is most accurate but heavier; Lite is fastest.
    - **MoveNet** (Lightning / Thunder, via TensorFlow.js): 17 keypoints,
      loaded from a CDN. Thunder is more accurate, Lightning faster.
-   - **YOLO-Pose** (via ONNX Runtime Web + WebGPU): 17 keypoints. Needs a
-     model file you supply (see "Adding a YOLO model" below).
 
    Internally every algorithm is mapped to the same 33-slot skeleton, so the
-   rest of the app is identical regardless of choice. Because the three do not
+   rest of the app is identical regardless of choice. Because the two do not
    agree on scale, **codes are saved per algorithm family**: a code taught with
    BlazePose is only matched against other BlazePose codes, and switching
    algorithms means re-teaching. Each code shows a small badge (BlazePose /
-   MoveNet / YOLO) in the Codes list. Your algorithm choice is remembered.
+   MoveNet) in the Codes list. Your algorithm choice is remembered.
    If several people are in frame, only the nearest (largest) skeleton is
    tracked, so a bystander in the background does not steal the tracking.
 
@@ -82,27 +80,9 @@ python3 -m http.server 8000
 
 Any static server works (`npx serve`, etc.). Allow camera access when prompted.
 
-## Adding a YOLO model
-
-The YOLO-Pose option needs a YOLOv8 or YOLO11 pose model exported to ONNX at
-640x640. There is no universal public URL for one, so you supply it: the first
-time you pick YOLO-Pose, the app prompts for a URL to the `.onnx` file (it must
-be served with permissive CORS, e.g. from the same GitHub Pages repo). To make
-one with [Ultralytics](https://docs.ultralytics.com/):
-
-```bash
-pip install ultralytics
-yolo export model=yolov8n-pose.pt format=onnx imgsz=640
-```
-
-Commit the resulting `yolov8n-pose.onnx` to the repo (note it is several MB) and
-give the app its URL (e.g. `https://<user>.github.io/algodance/yolov8n-pose.onnx`).
-The URL is remembered in the browser. MoveNet and BlazePose need no setup.
-
-> Note: MoveNet and YOLO-Pose are newer additions and depend on third-party
-> CDN builds (TensorFlow.js, ONNX Runtime Web). BlazePose is the most
-> thoroughly tested path; if an algorithm fails to load, the app reverts to
-> the previous one and keeps running.
+> Note: MoveNet depends on a third-party CDN build (TensorFlow.js). BlazePose
+> is the default and the most thoroughly tested path; if an algorithm fails to
+> load, the app reverts to the previous one and keeps running.
 
 ## Use
 
@@ -124,7 +104,7 @@ The URL is remembered in the browser. MoveNet and BlazePose need no setup.
   that pauses on every count until you hit the pose (Space skips). Rehearse
   plays the move once, then counts you in to perform it from memory and
   scores your attempt. Rename, delete, and export/import as JSON.
-- **AlgoDance:** the zine, read full screen one page at a time. Flip with a
+- **Zine:** read full screen one page at a time. Flip with a
   click, the chevrons, or the arrow keys; the header collapses while reading
   (the floating Menu button brings it back). Rendered with pdf.js, loaded only
   when the tab is opened; if that fails, the PDF embeds directly instead.

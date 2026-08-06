@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AlgoDance: Code a movement</title>
-  <link rel="stylesheet" href="style.css?v=51" />
+  <link rel="stylesheet" href="style.css?v=52" />
 </head>
 <body>
   <!-- Riso duotone filter (deep-red shadows to yellow highlights, lightly
@@ -47,7 +47,7 @@
       <button class="tab" data-tab="perform" role="tab" id="tab-perform" aria-controls="pane-perform" aria-selected="false" tabindex="-1">Perform</button>
       <button class="tab" data-tab="codes" role="tab" id="tab-codes" aria-controls="pane-codes" aria-selected="false" tabindex="-1">Codes</button>
       <button class="tab" data-tab="about" role="tab" id="tab-about" aria-controls="pane-about" aria-selected="false" tabindex="-1">About</button>
-      <button class="tab" data-tab="algodance" role="tab" id="tab-algodance" aria-controls="pane-algodance" aria-selected="false" tabindex="-1">AlgoDance Zine</button>
+      <button class="tab" data-tab="algodance" role="tab" id="tab-algodance" aria-controls="pane-algodance" aria-selected="false" tabindex="-1">Zine</button>
     </nav>
   </header>
 
@@ -94,9 +94,6 @@
             <option value="movenet-lightning">MoveNet Lightning (fast)</option>
             <option value="movenet-thunder">MoveNet Thunder (accurate)</option>
           </optgroup>
-          <optgroup label="YOLO-Pose / ONNX Runtime Web (17 points)">
-            <option value="yolo">YOLO-Pose (needs a model file)</option>
-          </optgroup>
         </select>
       </div>
     </section>
@@ -131,10 +128,11 @@
           <small class="muted">Chain codes into a choreography. Each move is cued by name, counted in, performed from memory, and scored; you get a routine score at the end.</small>
         </div>
 
-        <button id="bgBtn" class="btn small block">Calibrate: learn my idle movement (10s)</button>
-        <small class="muted">One-time (per algorithm): move around casually for 10 seconds, without performing your codes. Words then only fire when a movement resembles them more than your own idle movement, which makes matching far more reliable.</small>
+        <button id="bgBtn" class="btn small block">Calibrate my idle movement</button>
+        <small class="muted">Takes 10 seconds, once per algorithm: move around casually without performing any of your codes. Words then only fire when a movement resembles them more than your own idle movement, which makes matching far more reliable.</small>
 
-        <button id="kioskBtn" class="btn ghost small">Kiosk mode: fullscreen performance view</button>
+        <button id="kioskBtn" class="btn ghost small">Enter kiosk mode</button>
+        <small class="muted">Fullscreen performance view for an installation: the camera fills the screen, every control disappears, and matched words float over the video.</small>
 
         <label class="field">
           <span>Sensitivity <em id="threshVal"></em></span>
@@ -150,7 +148,7 @@
           </select>
           <small class="muted">Manual mode captures only while you hold, a fallback for noisy backgrounds or precise control.</small>
         </label>
-        <button id="holdBtn" class="btn block" hidden>Hold to capture (or hold Space)</button>
+        <button id="holdBtn" class="btn block" hidden>Hold to capture (or Space)</button>
 
         <label class="check"><input type="checkbox" id="soundToggle" checked /> Ping on match</label>
         <label class="check"><input type="checkbox" id="speakToggle" checked /> Speak matched words aloud</label>
@@ -230,14 +228,14 @@
           <li><b>Your camera stays on your device.</b> Video is processed frame by frame in the browser to detect body pose and is never uploaded, recorded, or stored. No video ever leaves your computer.</li>
           <li><b>Only coordinates are saved.</b> A saved code is just a short sequence of skeleton coordinates, stored in your browser's local storage. No images.</li>
           <li><b>You are in control.</b> Export or delete your codes anytime in the Codes tab. Clearing your browser storage removes everything.</li>
-          <li><b>Third-party models.</b> The pose models (MediaPipe BlazePose, and optionally MoveNet or YOLO) download once from public CDNs so detection can run on your device. That is a normal file download; your camera data is not part of it.</li>
+          <li><b>Third-party models.</b> The pose models (MediaPipe BlazePose, and optionally MoveNet) download once from public CDNs so detection can run on your device. That is a normal file download; your camera data is not part of it.</li>
         </ul>
 
         <h3>How it works</h3>
         <p class="muted">Pose tracking runs in the browser (WebAssembly / WebGPU). Movements are compared with Dynamic Time Warping so tempo does not matter, and matching happens entirely on your device.</p>
 
         <h3>The zine</h3>
-        <p class="muted">Read the AlgoDance document: <a href="AlgoDance.pdf" target="_blank" rel="noopener">open the PDF</a>, or see the <b>AlgoDance Zine</b> tab.</p>
+        <p class="muted">Read the AlgoDance document: <a href="AlgoDance.pdf" target="_blank" rel="noopener">open the PDF</a>, or see the <b>Zine</b> tab.</p>
       </div>
 
       <!-- ALGODANCE: a zine you flip through, page by page -->
@@ -253,6 +251,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=51"></script>
+  <script type="module" src="app.js?v=52"></script>
 </body>
 </html>
