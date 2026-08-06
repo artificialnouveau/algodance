@@ -73,7 +73,26 @@ const BLAZE_URLS = {
 let mpFileset = null;
 
 class BlazeBackend {
-  constructor(key) { this.key = key; this.family = "blaze"; this.connections = BLAZE_CONNECTIONS; this.lm = null; }
+  constructor(key) {
+    this.key = key; this.family = "blaze"; this.connections = BLAZE_CONNECTIONS; this.lm = null;
+    // The landmark model can also emit a person mask from the SAME inference,
+    // so cutting the background out costs one option, not a second model.
+    this.supportsMask = true;
+    this.wantMask = false;
+    this.lastMask = null;
+  }
+  // Toggled at runtime; setOptions re-configures the running landmarker rather
+  // than rebuilding it, so the video never stalls.
+  async setMask(on) {
+    if (!this.lm || this.wantMask === on) return;
+    this.wantMask = on;
+    await this.lm.setOptions({ outputSegmentationMasks: on });
+    if (!on) this._releaseMask();
+  }
+  _releaseMask() {
+    if (this.lastMask) { try { this.lastMask.close(); } catch {} }
+    this.lastMask = null;
+  }
   async load() {
     mpFileset = mpFileset || await FilesetResolver.forVisionTasks(
       "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
@@ -90,13 +109,26 @@ class BlazeBackend {
     catch (e) { console.warn("BlazePose GPU failed, using CPU:", e); this.lm = await make("CPU"); }
   }
   // MediaPipe returns 33 landmarks {x,y,z,visibility} already in image space.
-  async detect(video, ts) { return this.lm.detectForVideo(video, ts).landmarks || []; }
-  close() { try { this.lm?.close(); } catch {} }
+  async detect(video, ts) {
+    const res = this.lm.detectForVideo(video, ts);
+    // Masks hold GPU memory and must be closed; the previous frame's is
+    // released as the new one arrives, and the consumer reads it in between.
+    this._releaseMask();
+    if (this.wantMask && res.segmentationMasks?.length) this.lastMask = res.segmentationMasks[0];
+    return res.landmarks || [];
+  }
+  close() { this._releaseMask(); try { this.lm?.close(); } catch {} }
 }
 
 // ---------- MoveNet (TensorFlow.js) ----------
 class MoveNetBackend {
-  constructor(key) { this.key = key; this.family = "movenet"; this.connections = COCO_CONNECTIONS; this.detector = null; }
+  constructor(key) {
+    this.key = key; this.family = "movenet"; this.connections = COCO_CONNECTIONS; this.detector = null;
+    // Keypoints only: no segmentation to composite from.
+    this.supportsMask = false;
+    this.lastMask = null;
+  }
+  async setMask() {}
   async load() {
     const tf = await import("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.22.0/+esm");
     await import("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.22.0/+esm");

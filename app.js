@@ -45,6 +45,8 @@ const video = document.getElementById("video");
 const videoWrap = document.querySelector(".video-wrap");
 const overlay = document.getElementById("overlay");
 const octx = overlay.getContext("2d");
+const cutout = document.getElementById("cutout");
+const cctx = cutout.getContext("2d");
 const teachPreview = document.getElementById("teachPreview");
 const statusEl = document.getElementById("status");
 const bigWord = document.getElementById("bigWord");
@@ -85,6 +87,7 @@ const triggerModeSel = document.getElementById("triggerMode");
 const holdBtn = document.getElementById("holdBtn");
 const soundToggle = document.getElementById("soundToggle");
 const speakToggle = document.getElementById("speakToggle");
+const cutoutToggle = document.getElementById("cutoutToggle");
 const speakPhraseBtn = document.getElementById("speakPhrase");
 const undoWordBtn = document.getElementById("undoWord");
 const wordList = document.getElementById("wordList");
@@ -128,12 +131,13 @@ let rearmSince = 0;
 let warmupOffered = false;    // the Perform warm-up offer shows once per session
 // Teach-on-a-beat tempo, persisted.
 const BPM_KEY = "algodance.bpm.v1";
+const DEFAULT_BPM = 107;
 function teachBpm() {
   const v = parseInt(bpmInput?.value, 10);
-  return isFinite(v) ? Math.min(160, Math.max(60, v)) : 100;
+  return isFinite(v) ? Math.min(160, Math.max(60, v)) : DEFAULT_BPM;
 }
 if (bpmInput) {
-  bpmInput.value = parseInt(localStorage.getItem(BPM_KEY), 10) || 100;
+  bpmInput.value = parseInt(localStorage.getItem(BPM_KEY), 10) || DEFAULT_BPM;
   bpmInput.addEventListener("change", () => {
     bpmInput.value = teachBpm();
     try { localStorage.setItem(BPM_KEY, String(teachBpm())); } catch {}
@@ -563,6 +567,7 @@ async function initPose() {
   recomputeWordStats(); // thresholds are per-family
   updateBgBtn();        // background calibration is per-family too
   renderPerformable();  // performable list is per-family
+  applyCutoutState();   // the mask option lives on the new landmarker
 }
 
 // Swap algorithm at runtime. Detection is paused (ready=false) during the
@@ -612,6 +617,8 @@ async function initCamera() {
   await video.play();
   overlay.width = video.videoWidth;
   overlay.height = video.videoHeight;
+  cutout.width = video.videoWidth;
+  cutout.height = video.videoHeight;
 }
 
 // Of the detected people, return the most prominent one: the nearest, which
@@ -829,6 +836,54 @@ const ORB_DEFS = [
   { i: 25, rgb: "236,255,0", r: 0.08 }, { i: 26, rgb: "255,0,42", r: 0.08 },
   { i: 27, rgb: "236,255,0", r: 0.11 }, { i: 28, rgb: "255,0,42", r: 0.11 },
 ];
+// The constellation has two looks. The default GLOWS: light-based orbs blended
+// additively, which is a screen effect. Mixed Media PRINTS: a flat disc punched
+// out of paper, a second ink pass a hair off register, and a halftone screen
+// inside it. Same geometry, opposite material.
+const MIXED_MEDIA = document.body.classList.contains("mm");
+const TAU = Math.PI * 2;
+
+// Each joint stamp is rendered ONCE into an offscreen canvas and then blitted
+// per frame. Drawing the halftone dot by dot every frame for every joint would
+// cost far more than the effect is worth.
+const STAMP_PX = 72;
+const stampCache = new Map();
+function inkStamp(rgb) {
+  if (stampCache.has(rgb)) return stampCache.get(rgb);
+  const c = document.createElement("canvas");
+  c.width = c.height = STAMP_PX;
+  const x = c.getContext("2d");
+  const m = STAMP_PX / 2, rad = m - 3;
+
+  // The punched disc: warm paper, so the joint reads as something laid ON the
+  // image rather than light coming out of it.
+  x.fillStyle = "#F4EEE0";
+  x.beginPath(); x.arc(m, m, rad, 0, TAU); x.fill();
+
+  // Halftone screen in the ink, clipped to the disc and denser toward the edge.
+  x.save();
+  x.beginPath(); x.arc(m, m, rad, 0, TAU); x.clip();
+  x.fillStyle = `rgb(${rgb})`;
+  const step = 5;
+  for (let gy = 0; gy < STAMP_PX; gy += step) {
+    for (let gx = 0; gx < STAMP_PX; gx += step) {
+      const d = Math.hypot(gx - m, gy - m) / rad;
+      const dot = Math.min(step * 0.46, step * 0.46 * (0.35 + d * 1.05));
+      if (dot <= 0.2) continue;
+      x.beginPath(); x.arc(gx + (gy / step % 2 ? step / 2 : 0), gy, dot, 0, TAU); x.fill();
+    }
+  }
+  x.restore();
+
+  // Cut edge.
+  x.strokeStyle = "rgba(28,24,21,.92)";
+  x.lineWidth = 2.2;
+  x.beginPath(); x.arc(m, m, rad, 0, TAU); x.stroke();
+
+  stampCache.set(rgb, c);
+  return c;
+}
+
 const trails = new Map(); // landmark index -> [{x, y, t}]
 function drawPresence(lms, now) {
   let sc = 0, P = null;
@@ -858,10 +913,10 @@ function drawPresence(lms, now) {
     while (arr.length && now - arr[0].t > TRAIL_MS) arr.shift();
   }
   octx.save();
-  octx.globalCompositeOperation = "lighter";
+  // Glow blends additively; ink does not. A printed stroke sits ON the frame.
+  octx.globalCompositeOperation = MIXED_MEDIA ? "source-over" : "lighter";
   octx.lineCap = "round";
   octx.lineJoin = "round";
-  // Two passes per segment: a wide soft glow under a bright core.
   const wBase = Math.max(3, sc * 0.12);
   for (const d of TRAIL_DEFS) {
     const arr = trails.get(d.i);
@@ -870,20 +925,46 @@ function drawPresence(lms, now) {
       const a = arr[k - 1], b = arr[k];
       if (b.t - a.t > 250) continue; // tracking gap: do not bridge it
       const fade = Math.max(0, 1 - (now - b.t) / TRAIL_MS);
-      octx.strokeStyle = `rgba(${d.rgb},${(0.1 * fade).toFixed(3)})`;
-      octx.lineWidth = wBase * 2.4 * fade + 2;
-      octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
-      octx.strokeStyle = `rgba(${d.rgb},${(0.5 * fade).toFixed(3)})`;
-      octx.lineWidth = wBase * fade + 1;
-      octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
+      if (MIXED_MEDIA) {
+        // A marker stroke: one opaque pass with a dry, uneven edge, plus a
+        // ghost of the second ink pass sitting off register beneath it.
+        const wob = 0.82 + 0.36 * ((k * 2654435761 % 97) / 97);
+        octx.strokeStyle = `rgba(28,24,21,${(0.16 * fade).toFixed(3)})`;
+        octx.lineWidth = wBase * 0.9 * fade * wob + 1.5;
+        octx.beginPath(); octx.moveTo(a.x + 2, a.y + 2); octx.lineTo(b.x + 2, b.y + 2); octx.stroke();
+        octx.strokeStyle = `rgba(${d.rgb},${(0.78 * fade).toFixed(3)})`;
+        octx.lineWidth = wBase * 0.85 * fade * wob + 1;
+        octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
+      } else {
+        // Two passes per segment: a wide soft glow under a bright core.
+        octx.strokeStyle = `rgba(${d.rgb},${(0.1 * fade).toFixed(3)})`;
+        octx.lineWidth = wBase * 2.4 * fade + 2;
+        octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
+        octx.strokeStyle = `rgba(${d.rgb},${(0.5 * fade).toFixed(3)})`;
+        octx.lineWidth = wBase * fade + 1;
+        octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
+      }
     }
   }
-  // The constellation: a soft orb per joint, white-hot centre into ink.
+  // The constellation: one mark per joint.
   if (P && sc > 8) {
     for (const o of ORB_DEFS) {
       const p = P(o.i);
       if (!p) continue;
       const r = Math.max(4, sc * o.r);
+      if (MIXED_MEDIA) {
+        // Printed, not lit: the ink pass lands first and a hair off register,
+        // then the punched-out halftone disc on top of it.
+        const off = Math.max(1.5, r * 0.16);
+        octx.globalCompositeOperation = "source-over";
+        octx.fillStyle = `rgba(${o.rgb},0.9)`;
+        octx.beginPath();
+        octx.arc(p.x + off, p.y + off * 0.85, r * 0.82, 0, TAU);
+        octx.fill();
+        const st = inkStamp(o.rgb);
+        octx.drawImage(st, p.x - r * 0.82, p.y - r * 0.82, r * 1.64, r * 1.64);
+        continue;
+      }
       const g = octx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
       g.addColorStop(0, "rgba(255,255,255,0.9)");
       g.addColorStop(0.35, `rgba(${o.rgb},0.75)`);
@@ -1098,6 +1179,12 @@ async function loop() {
     catch (e) { console.error("frame error:", e); }
     finally { inflight = false; }
   }
+  // Every frame, not just detection frames: the figure has to move with the
+  // video, not with the model.
+  if (cutoutOn && !idleTab) {
+    try { compositeCutout(t); }
+    catch (e) { console.warn("cutout failed:", e); }
+  }
 }
 
 async function runFrame() {
@@ -1106,6 +1193,12 @@ async function runFrame() {
     let poses = [];
     try { poses = await backend.detect(video, now); }
     catch (e) { console.warn("detect failed:", e); }
+    // Feed the mask average while this frame's mask is still alive (the
+    // backend releases it on the next detect). The drawing happens in loop().
+    if (cutoutOn && backend?.lastMask) {
+      try { ingestMask(backend.lastMask); }
+      catch (e) { console.warn("mask failed:", e); }
+    }
     octx.clearRect(0, 0, overlay.width, overlay.height);
 
     let bodyVisible = false;
@@ -1149,6 +1242,7 @@ async function runFrame() {
             e.y < shoulderMidY + 0.05 && // the arm is genuinely raised
             w.y < e.y);                  // and the wrist continues upward
         const handVis = wristUsable(lms[15], lms[13]) || wristUsable(lms[16], lms[14]);
+        lastHandVis = handVis;
         if (teach) {
           teachStep(vec, hands, nearNow, now, handVis);
         } else if (currentTab === "perform" && !playback) {
@@ -1188,6 +1282,14 @@ async function runFrame() {
         if (teach && !teach.manual && !playback) { drawRestTargets(); drawHandLabels(lms); }
         else if (!teach && currentTab === "teach" && !playback) {
           drawHandLabels(lms);
+          // Say it before they hit Record, not after the take is wasted.
+          if (!lastHandVis && !teachHandsLost) {
+            teachHandsLost = true;
+            statusEl.textContent = "Can't see your hands. Keep at least one hand in view before you record.";
+          } else if (lastHandVis && teachHandsLost) {
+            teachHandsLost = false;
+            setPerformState();
+          }
           // Between takes of the same word, covering the face with the RIGHT
           // hand (held ~half a second) starts the next take, no click needed.
           if (rearmWord && wordInput.value.trim().toLowerCase() === rearmWord) {
@@ -1278,6 +1380,8 @@ const MAX_MOVE_MS = 7000;
 const perfBuf = [];               // {vec, t}
 let moving = false, moveStart = 0, lastActive = 0;
 let perfHandsLost = false;        // matching paused because no wrist is tracked
+let teachHandsLost = false;       // same warning, on the idle Teach tab
+let lastHandVis = false;          // is at least one wrist usable this frame
 
 // ---------- Background class (idle-movement calibration) ----------
 // The user records ~10s of their own ordinary movement (shifting, adjusting,
@@ -1873,22 +1977,166 @@ function matchAndFire(frames, now) {
   }
 }
 
+// ---------- Background cutout ----------
+// Opt-in. The person mask comes free with BlazePose's own inference, but the
+// compositing does not, and that is the real cost of this feature.
+//
+// Two things make the difference between this looking broken and looking cut:
+//  1. The mask arrives at DETECTION rate (a few times a second) and the video
+//     runs at display rate. Compositing only when a mask landed made the body
+//     stutter while the background moved smoothly. So the composite runs every
+//     animation frame off the most recent mask.
+//  2. A raw per-frame mask boils: its edge crawls a few pixels every frame.
+//     So masks feed an exponential average rather than being used directly.
+// Matching never looks at any of this; it works on landmarks, not pixels.
+const CUTOUT_KEY = "algodance.cutout.v1";
+let cutoutOn = localStorage.getItem(CUTOUT_KEY) === "1";
+
+const MASK_BLEND = 0.42;   // how fast the average chases a new mask
+const MASK_STALE_MS = 500; // no mask for this long: dissolve, do not freeze
+
+let maskEma = null, maskW = 0, maskH = 0, maskAt = 0;
+let softC = null, softX = null, softImg = null; // feathered -> the body's alpha
+let hardC = null, hardX = null, hardImg = null; // thresholded -> the outline
+let silC = null, silX = null;                   // dilated silhouette
+let tintC = null, tintX = null;                 // second ink pass (Mixed Media)
+let bodyC = null, bodyX = null;                 // video masked to the body
+
+function ensureMaskBuffers(w, h) {
+  if (maskW === w && maskH === h && maskEma) return;
+  maskW = w; maskH = h;
+  maskEma = new Float32Array(w * h);
+  const mk = () => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+  softC = mk(); softX = softC.getContext("2d"); softImg = softX.createImageData(w, h);
+  hardC = mk(); hardX = hardC.getContext("2d"); hardImg = hardX.createImageData(w, h);
+  silC = mk(); silX = silC.getContext("2d");
+  tintC = mk(); tintX = tintC.getContext("2d");
+}
+
+// Fold a freshly arrived mask into the running average.
+function ingestMask(mask) {
+  ensureMaskBuffers(mask.width, mask.height);
+  const conf = mask.getAsUint8Array(), ema = maskEma;
+  for (let i = 0; i < ema.length; i++) ema[i] += (conf[i] - ema[i]) * MASK_BLEND;
+  rebuildMaskLayers();
+  maskAt = performance.now();
+}
+
+// Turn the averaged mask into the two layers the composite needs, plus the
+// dilated silhouette the outline is drawn from. All at mask resolution, which
+// is a small fraction of the frame, so this stays cheap.
+function rebuildMaskLayers() {
+  const ema = maskEma, soft = softImg.data, hard = hardImg.data;
+  for (let i = 0, j = 3; i < ema.length; i++, j += 4) {
+    const v = ema[i];
+    soft[j] = v;                   // keep the gradient: a feathered cut edge
+    hard[j] = v > 118 ? 255 : 0;   // solid: an outline needs a hard border
+  }
+  softX.putImageData(softImg, 0, 0);
+  hardX.putImageData(hardImg, 0, 0);
+
+  // Dilate by stamping the silhouette around a small ring. Done here at mask
+  // size and scaled up once, rather than a dozen full-frame draws per frame.
+  const r = Math.max(1, Math.round(maskW * 0.012));
+  silX.clearRect(0, 0, maskW, maskH);
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2;
+    silX.drawImage(hardC, Math.cos(a) * r, Math.sin(a) * r);
+  }
+
+  if (MIXED_MEDIA) {
+    // A second ink pass in red, sitting off register behind the figure.
+    tintX.globalCompositeOperation = "source-over";
+    tintX.clearRect(0, 0, maskW, maskH);
+    tintX.drawImage(silC, 0, 0);
+    tintX.globalCompositeOperation = "source-in";
+    tintX.fillStyle = "#FF002A";
+    tintX.fillRect(0, 0, maskW, maskH);
+    tintX.globalCompositeOperation = "source-over";
+  }
+}
+
+// Runs every animation frame, so the body moves at video rate even though the
+// mask behind it only updates when the model produces one.
+function compositeCutout(now) {
+  if (!maskEma) return;
+  const W = cutout.width, H = cutout.height;
+  if (!W || !H) return;
+  if (!bodyC || bodyC.width !== W || bodyC.height !== H) {
+    bodyC = document.createElement("canvas");
+    bodyC.width = W; bodyC.height = H;
+    bodyX = bodyC.getContext("2d");
+  }
+
+  // Lost tracking: dissolve the figure instead of leaving a stale one pinned
+  // to the screen while the person has already moved.
+  if (now - maskAt > MASK_STALE_MS) {
+    let alive = false;
+    for (let i = 0; i < maskEma.length; i++) {
+      maskEma[i] *= 0.88;
+      if (maskEma[i] > 2) alive = true;
+    }
+    rebuildMaskLayers();
+    if (!alive) { cctx.clearRect(0, 0, W, H); return; }
+  }
+
+  bodyX.clearRect(0, 0, W, H);
+  bodyX.drawImage(video, 0, 0, W, H);
+  bodyX.globalCompositeOperation = "destination-in";
+  bodyX.drawImage(softC, 0, 0, W, H);
+  bodyX.globalCompositeOperation = "source-over";
+
+  cctx.clearRect(0, 0, W, H);
+  const off = Math.max(3, Math.round(W * 0.008));
+  if (MIXED_MEDIA) cctx.drawImage(tintC, off, off * 0.85, W, H);
+  cctx.drawImage(silC, 0, 0, W, H);   // the black outline
+  cctx.drawImage(bodyC, 0, 0);        // the figure on top of it
+}
+
+function applyCutoutState() {
+  const usable = cutoutOn && !!backend?.supportsMask;
+  document.body.classList.toggle("cutout", usable);
+  if (!usable) {
+    cctx.clearRect(0, 0, cutout.width, cutout.height);
+    maskEma = null; maskW = maskH = 0;
+  }
+  backend?.setMask?.(usable);
+  if (cutoutToggle) {
+    cutoutToggle.checked = cutoutOn;
+    const unsupported = !backend?.supportsMask;
+    cutoutToggle.disabled = unsupported;
+    cutoutToggle.title = unsupported
+      ? "Only BlazePose produces a body outline. Switch algorithm to use this."
+      : "Keep the body, drop everything behind it.";
+  }
+}
+
+if (cutoutToggle) {
+  cutoutToggle.addEventListener("change", () => {
+    cutoutOn = cutoutToggle.checked;
+    try { localStorage.setItem(CUTOUT_KEY, cutoutOn ? "1" : "0"); } catch {}
+    applyCutoutState();
+  });
+}
+
 // Status text under the video, per tab. Only Perform "watches".
 function setPerformState() {
   if (!ready) return;
   if (currentTab === "teach") {
-    statusEl.textContent = "● ready. Type a word and click Record movement to teach a code.";
+    // The instruction for teaching lives in the Teach panel, above the field it
+    // is telling you to fill in; the status bar just reports state.
+    statusEl.textContent = "● Ready.";
     return;
   }
   if (currentTab !== "perform") {
-    statusEl.textContent = "● ready.";
+    statusEl.textContent = "● Ready.";
     return;
   }
   if (triggerMode === "manual") {
-    statusEl.textContent = manualCapturing ? "● capturing movement…" : "● ready. Hold the button to capture.";
+    statusEl.textContent = manualCapturing ? "● Capturing movement…" : "● Ready. Hold the button to capture.";
     return;
   }
-  statusEl.textContent = "● watching — perform a saved code and its label will appear.";
+  statusEl.textContent = "● Watching — perform a saved code and its label will appear.";
 }
 
 function fireWord(word, now) {
@@ -2175,6 +2423,14 @@ function updateTeachUI(bodyVisible) {
     countdownEl.hidden = false;
     countdownEl.textContent = "?";
     statusEl.textContent = "Can't see your shoulders. Adjust your framing.";
+    return;
+  }
+  // Hands carry most of a movement, so a take recorded without them is a code
+  // that could never be matched back. Same requirement Perform enforces.
+  if (!lastHandVis) {
+    countdownEl.hidden = false;
+    countdownEl.textContent = "?";
+    statusEl.textContent = "Can't see your hands. Keep at least one hand in view; recording is paused.";
     return;
   }
   // The big overlay owns the countdown / REC states; keep the pill hidden.
@@ -3491,7 +3747,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v52 (2026-08-06)");
+  console.log("AlgoDance build v56 (2026-08-06)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AlgoDance: Code a movement</title>
-  <link rel="stylesheet" href="style.css?v=52" />
+  <link rel="stylesheet" href="style.css?v=56" />
 </head>
 <body>
   <!-- Riso duotone filter (deep-red shadows to yellow highlights, lightly
@@ -53,8 +53,16 @@
 
   <main class="layout">
     <section class="stage">
+      <div id="introHint" class="intro-hint" hidden>
+        <p>Stand back so your <b>head, shoulders and hands</b> are in view. When glowing dots appear on your joints, you're being tracked; your head, hands and feet leave light trails as you move.</p>
+        <button id="introDismiss" class="btn small">Got it</button>
+      </div>
+
       <div class="video-wrap">
         <video id="video" playsinline muted></video>
+        <!-- Background cutout: the masked body, painted over the hidden video.
+             Empty and inert unless the toggle is on. -->
+        <canvas id="cutout" aria-hidden="true"></canvas>
         <div id="grain" class="grain" aria-hidden="true"></div>
         <canvas id="overlay"></canvas>
         <!-- Dance-tutorial playback: the count numeral and the 8-count strip -->
@@ -73,10 +81,6 @@
         <!-- Kiosk mode: the phrase, mirrored over the video for the audience -->
         <div id="kioskPhrase" class="kiosk-phrase" aria-hidden="true"></div>
         <div id="closestHint" class="closest-hint" hidden></div>
-        <div id="introHint" class="intro-hint" hidden>
-          <p>Stand back so your <b>head, shoulders and hands</b> are in view. When glowing dots appear on your joints, you're being tracked; your head, hands and feet leave light trails as you move.</p>
-          <button id="introDismiss" class="btn small">Got it</button>
-        </div>
       </div>
       <div class="status-bar">
         <span id="countdown" class="pill" hidden></span>
@@ -95,6 +99,7 @@
             <option value="movenet-thunder">MoveNet Thunder (accurate)</option>
           </optgroup>
         </select>
+        <label class="check inline"><input type="checkbox" id="cutoutToggle" /> Cut out background</label>
       </div>
     </section>
 
@@ -102,7 +107,7 @@
       <!-- PERFORM -->
       <div class="tabpane" data-pane="perform" id="pane-perform" role="tabpanel" aria-labelledby="tab-perform" hidden>
         <h2>Perform</h2>
-        <p class="muted">Just perform. The app watches your movements continuously; when one matches a saved code, its word appears above your head, is spoken aloud, and joins your phrase below. Striking and <b>holding a pose</b> for half a second counts too, no motion needed. <b>Keep at least one hand visible to the camera</b>: hands carry most of a movement, so matching pauses while both hands are out of view.</p>
+        <p class="muted">Just perform. When a movement matches a saved code, its word appears above your head and joins the phrase below. Holding a pose for half a second counts too. <b>Keep at least one hand in view</b>, matching pauses while both are hidden.</p>
 
         <div id="warmupOffer" class="warmup" hidden>
           <span>Warm up first? Dance each of your codes once, with counts, before matching starts.</span>
@@ -116,42 +121,6 @@
           <h3>Your codes</h3>
           <div id="performList" class="chips" aria-live="polite"></div>
         </div>
-
-        <div class="routine">
-          <h3>Routine</h3>
-          <div id="routineList" class="chips"></div>
-          <div class="row-actions">
-            <select id="routineAdd"><option value="">Add a code…</option></select>
-            <button id="routineStart" class="btn small">Start routine</button>
-            <button id="routineClear" class="btn ghost small">Clear</button>
-          </div>
-          <small class="muted">Chain codes into a choreography. Each move is cued by name, counted in, performed from memory, and scored; you get a routine score at the end.</small>
-        </div>
-
-        <button id="bgBtn" class="btn small block">Calibrate my idle movement</button>
-        <small class="muted">Takes 10 seconds, once per algorithm: move around casually without performing any of your codes. Words then only fire when a movement resembles them more than your own idle movement, which makes matching far more reliable.</small>
-
-        <button id="kioskBtn" class="btn ghost small">Enter kiosk mode</button>
-        <small class="muted">Fullscreen performance view for an installation: the camera fills the screen, every control disappears, and matched words float over the video.</small>
-
-        <label class="field">
-          <span>Sensitivity <em id="threshVal"></em></span>
-          <input id="thresh" type="range" min="0.06" max="0.6" step="0.01" value="0.28" />
-          <small class="muted">Left = stricter, right = looser. Words with several examples auto-calibrate; this scales that.</small>
-        </label>
-
-        <label class="field">
-          <span>Trigger</span>
-          <select id="triggerMode">
-            <option value="auto">Continuous (watch and match automatically)</option>
-            <option value="manual">Manual (hold the button or Spacebar)</option>
-          </select>
-          <small class="muted">Manual mode captures only while you hold, a fallback for noisy backgrounds or precise control.</small>
-        </label>
-        <button id="holdBtn" class="btn block" hidden>Hold to capture (or Space)</button>
-
-        <label class="check"><input type="checkbox" id="soundToggle" checked /> Ping on match</label>
-        <label class="check"><input type="checkbox" id="speakToggle" checked /> Speak matched words aloud</label>
 
         <div class="meter">
           <div class="meter-row"><span>Closest code</span><b id="bestWord">—</b></div>
@@ -169,6 +138,47 @@
         </div>
         <div id="phrase" class="phrase" aria-live="polite"></div>
 
+        <details class="more">
+          <summary>Routine</summary>
+          <div class="routine">
+            <div id="routineList" class="chips"></div>
+            <div class="row-actions">
+              <select id="routineAdd"><option value="">Add a code…</option></select>
+              <button id="routineStart" class="btn small">Start routine</button>
+              <button id="routineClear" class="btn ghost small">Clear</button>
+            </div>
+            <small class="muted">Chain codes into a choreography. Each move is cued by name, counted in, performed from memory, and scored; you get a routine score at the end.</small>
+          </div>
+        </details>
+
+        <details class="more">
+          <summary>Tuning</summary>
+          <label class="field">
+            <span>Sensitivity <em id="threshVal"></em></span>
+            <input id="thresh" type="range" min="0.06" max="0.6" step="0.01" value="0.28" />
+            <small class="muted">Left = stricter, right = looser. Words with several examples auto-calibrate; this scales that.</small>
+          </label>
+
+          <label class="field">
+            <span>Trigger</span>
+            <select id="triggerMode">
+              <option value="auto">Continuous (watch and match automatically)</option>
+              <option value="manual">Manual (hold the button or Spacebar)</option>
+            </select>
+            <small class="muted">Manual mode captures only while you hold, a fallback for noisy backgrounds or precise control.</small>
+          </label>
+          <button id="holdBtn" class="btn block" hidden>Hold to capture (or Space)</button>
+
+          <label class="check"><input type="checkbox" id="soundToggle" checked /> Ping on match</label>
+          <label class="check"><input type="checkbox" id="speakToggle" checked /> Speak matched words aloud</label>
+
+          <button id="bgBtn" class="btn small block">Calibrate my idle movement</button>
+          <small class="muted">Takes 10 seconds, once per algorithm: move around casually without performing any of your codes. Words then only fire when a movement resembles them more than your own idle movement.</small>
+
+          <button id="kioskBtn" class="btn ghost small block">Enter kiosk mode</button>
+          <small class="muted">Fullscreen performance view for an installation: the camera fills the screen and every control disappears.</small>
+        </details>
+
         <details class="diag">
           <summary>Match diagnosis</summary>
           <pre id="diagBox">Perform something and every decision shows up here: what matched, what was rejected, and by which rule.</pre>
@@ -185,6 +195,8 @@
         </ol>
         <p class="muted">The hand-to-face moments are trimmed automatically, so only your movement is saved. Record the same word more than once to add examples and make it easier to recognize.</p>
 
+        <p id="teachHint" class="teach-hint">Ready. Type a word below, then click <b>Record movement</b> to teach a code.</p>
+
         <label class="field">
           <span>Word or phrase</span>
           <input id="wordInput" type="text" placeholder="e.g. hello / yes / I love you" maxlength="60" list="wordList" />
@@ -193,7 +205,7 @@
 
         <label class="field">
           <span>Tempo</span>
-          <input id="bpmInput" type="number" min="60" max="160" step="5" value="100" /> BPM
+          <input id="bpmInput" type="number" min="60" max="160" step="1" value="107" /> BPM
           <small class="muted">While recording, a metronome ticks an 8-count at this tempo. Teach your movement ON the counts and it will play back, step through, and chain far more naturally.</small>
         </label>
 
@@ -251,6 +263,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=52"></script>
+  <script type="module" src="app.js?v=56"></script>
 </body>
 </html>

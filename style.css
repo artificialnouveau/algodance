@@ -451,6 +451,12 @@ body.rot90 .video-wrap { width: 100%; height: auto; max-width: none; }
 /* Recording state strip below the video (REST / MOVE / REC / 3-2-1). Kept out
    of the stream so the video stays unobstructed. */
 .status-bar {
+  /* Shrink-wrapped and centred under the video: these hold a few words each,
+     and a full-width bar for "Ready." reads as an empty container. */
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
   margin-top: 10px;
   display: flex;
   align-items: center;
@@ -478,6 +484,10 @@ body.rot90 .video-wrap { width: 100%; height: auto; max-width: none; }
 }
 
 .model-row {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
   margin-top: 10px;
   display: flex;
   align-items: center;
@@ -944,22 +954,29 @@ a { color: var(--yellow); }
   pointer-events: none;
 }
 
-/* First-run framing hint */
+/* A post-it stuck next to the screen, not a label pasted over the performer.
+   Lives in the stage above the video so it never covers anyone. */
 .intro-hint {
-  position: absolute;
-  left: 12px; right: 12px; bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--r-lg);
-  background: rgba(20,8,9,.92);
-  border: 1px solid var(--accent);
-  box-shadow: var(--shadow-card);
+  position: relative;
+  width: min(340px, 100%);
+  margin: 0 0 12px;
+  display: block;
+  padding: 15px 17px 13px;
+  /* Post-it stock: soft canary, a touch deeper toward the bottom where the
+     adhesive strip sits. Not the riso yellow, which is a printing ink. */
+  background: linear-gradient(180deg, #FBF5A4 0%, #F6EC8B 62%, #EFE178 100%);
+  color: #2E2A18;
+  border: none;
+  border-radius: 2px;
+  transform: rotate(-1.6deg);
+  box-shadow:
+    0 1px 1px rgba(40,34,10,.22),
+    5px 9px 18px rgba(20,34,44,.30);
 }
-.intro-hint p { margin: 0; font-size: 14px; color: var(--text); }
-.intro-hint b { color: var(--yellow); }
-.intro-hint .btn { flex-shrink: 0; }
+.intro-hint p { margin: 0; font-size: 15px; line-height: 1.5; color: #2E2A18; }
+.intro-hint b { color: #B3001B; }
+.intro-hint .btn { margin-top: 13px; }
+
 
 /* Reading pages (About / AlgoDance): hide the video stage, panel fills width. */
 .layout.content-full { grid-template-columns: 1fr; }
@@ -981,3 +998,70 @@ body.rot90 {
 /* Rotated screens are tall and narrow: give the video the full width and
    stack the panel underneath instead of squeezing them side by side. */
 body.rot90 .layout { grid-template-columns: 1fr; }
+
+/* Teach: the instruction sits directly above the field it refers to. */
+.teach-hint {
+  margin: 14px 0 4px;
+  padding: 9px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: 14px;
+}
+.teach-hint b { color: var(--yellow); }
+
+/* Background cutout: the masked body sits exactly where the video does and
+   replaces it, so the skeleton overlay above still lines up pixel for pixel. */
+#cutout {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  display: none;
+  pointer-events: none;
+}
+body.cutout #cutout { display: block; }
+/* The video keeps playing (the model still reads frames from it), it just
+   stops painting. */
+body.cutout #video { visibility: hidden; }
+body.cutout .video-wrap { background: #0b0a0c; }
+
+@media (max-width: 900px) {
+  /* Pinned by left/right on phones, so the desktop shrink-wrap must not apply. */
+  .status-bar, .model-row { width: auto; }
+  /* The video is fixed and fullscreen on phones, so the note has to float
+     over it or it sits underneath and is never seen. */
+  .intro-hint {
+    position: fixed;
+    left: 12px; right: 12px; bottom: 16px;
+    top: auto;
+    width: auto;
+    z-index: 28;
+    transform: rotate(-1.2deg);
+  }
+}
+
+/* The cutout toggle rides in the row under the video, so it is reachable from
+   Teach as well as Perform. */
+.check.inline { margin: 0; font-size: 13px; white-space: nowrap; }
+.check.inline input { width: 15px; height: 15px; }
+
+/* Perform had fifteen stacked blocks. Everything past the core three (your
+   codes, is it matching, the phrase) now sits behind one of these. */
+.more { margin: 16px 0 0; }
+.more > summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  list-style: revert;
+}
+.more > summary:hover { color: var(--accent); }
+.more[open] > summary { margin-bottom: 4px; }
+
+/* A black outline is invisible on a black field: with the background cut away
+   the figure needs a light ground to be cut OUT of. */
+body.cutout .video-wrap { background: #E7E2D8; }
