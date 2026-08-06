@@ -276,18 +276,29 @@ body {
   .layout { grid-template-columns: 1fr; }
 }
 
-.stage { min-width: 0; }
-/* Sized so the header, the video, the status line, and the algorithm row all
-   fit the window with no scrolling: height is capped by the viewport (minus
-   the header and the bars) and by the column width (via the aspect ratio). */
+.stage {
+  min-width: 0;
+  /* A column that measures itself. The post-it, the status bar and the
+     algorithm row take the height they need; the video takes what is left.
+     This replaced a hardcoded "100vh - 280px", which was calibrated against an
+     older, shorter header and silently stopped adding up once the wordmark
+     grew and the post-it moved into the stage, pushing the bottom of the page
+     out of a viewport that cannot scroll. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Fills the height the stage has left over. The video and both overlay
+   canvases are object-fit:cover against the same box, so they stay aligned
+   whatever shape that box ends up. */
 .video-wrap {
   position: relative;
-  width: auto;
+  flex: 1 1 auto;
+  width: 100%;
   max-width: 100%;
-  height: min(calc(100vh - 280px), calc((100vw - 380px) * 0.5625));
-  min-height: 240px;
-  aspect-ratio: 16 / 9;
-  margin: 0 auto;
+  height: auto;
+  min-height: 0;
+  margin: 0;
   background: #12100E;
   border-radius: 0;
   overflow: hidden;
@@ -315,7 +326,13 @@ body {
   .video-wrap { width: 100%; height: auto; }
 }
 /* Rotated mode scrolls; the video takes the full width there. */
-body.rot90 .video-wrap { width: 100%; height: auto; max-width: none; }
+body.rot90 .video-wrap {
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  max-width: none;
+  aspect-ratio: 16 / 9;
+}
 /* Desktop: the page itself never scrolls (the side panel scrolls internally),
    so the header and status line are always on screen. */
 @media (min-width: 901px) {
@@ -682,6 +699,9 @@ body.rot90 .video-wrap { width: 100%; height: auto; max-width: none; }
 /* The working sheet: faintly ruled like a notebook, cut on all four edges,
    tilted the opposite way to the masthead so the stack reads as layers. */
 .panel {
+  /* Without min-height:0 a grid item refuses to shrink below its content, so
+     overflow:auto below never engages and the column pushes the page taller. */
+  min-height: 0;
   background:
     repeating-linear-gradient(180deg, rgba(20,65,122,.07) 0 1px, rgba(0,0,0,0) 1px 26px),
     var(--paper-2);
@@ -1223,6 +1243,7 @@ a:hover { color: var(--accent); }
    Lives in the stage above the video so it never covers anyone. */
 .intro-hint {
   position: relative;
+  flex: 0 0 auto;
   width: min(340px, 100%);
   margin: 0 0 12px;
   display: block;
