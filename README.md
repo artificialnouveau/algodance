@@ -146,7 +146,9 @@ The URL is remembered in the browser. MoveNet and BlazePose need no setup.
 1. Push to `main`.
 2. Repo **Settings > Pages > Build and deployment > Deploy from a branch**.
 3. Branch: `main`, folder: `/ (root)`. Save.
-4. Site publishes at `https://artificialnouveau.github.io/algodance/`.
+4. Site publishes at `https://www.artificialnouveau.com/algodance/` (the
+   account's Pages custom domain; without one it would be
+   `https://artificialnouveau.github.io/algodance/`).
 
 ## Docs
 
