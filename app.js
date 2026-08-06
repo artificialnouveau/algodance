@@ -271,6 +271,9 @@ const NEAR_FACE_R = 1.0;
 // on top of the enter/exit hysteresis. Kills single-frame flicker when the
 // covering hand makes the face landmarks jump.
 const REST_DEBOUNCE = 2;
+// Asymmetric on purpose: latch on quickly, let go reluctantly. A couple of bad
+// frames used to be enough to drop a hand that never left the face.
+const REST_RELEASE_DEBOUNCE = 6;
 // Landmark indices are from the SUBJECT's perspective: 15 = their left wrist,
 // 16 = their right wrist. The video is mirrored, so on screen the R label
 // appears on the side where the viewer sees their right hand.
@@ -339,7 +342,7 @@ function updateHandsOnFace(lms, now) {
     }
     if (inRange !== st.on) {
       st.streak++;
-      if (st.streak >= REST_DEBOUNCE) { st.on = inRange; st.streak = 0; }
+      if (st.streak >= (st.on ? REST_RELEASE_DEBOUNCE : REST_DEBOUNCE)) { st.on = inRange; st.streak = 0; }
     } else {
       st.streak = 0;
     }
@@ -1096,8 +1099,17 @@ function buildPoseStrip(seq, { count = 3, size = 96 } = {}) {
 // smooths hard when the body is slow (kills jitter) and barely at all when
 // it is fast (no lag on real dance moves). Applied to the tracked person's
 // landmarks before anything else consumes them.
-const EURO_MIN_CUTOFF = 1.5; // Hz: smoothing floor at rest
-const EURO_BETA = 0.3;       // how quickly speed unlocks the filter
+// Hz: smoothing floor at rest. This was 1.5, which left a stationary wrist
+// visibly jittering, and that jitter was enough to shake the hand off the face
+// marker and cancel a countdown. Beta below still unlocks the filter as soon as
+// you actually move, so a held pose is steady without a danced one lagging.
+const EURO_MIN_CUTOFF = 0.9;
+// Raised alongside the lower floor above. One Euro's cutoff is
+// min_cutoff + beta*speed, so dropping the floor from 1.5 to 0.9 would have
+// slowed fast limbs too; 0.5 puts a moving hand back where it was (0.9 + 0.5v
+// vs the old 1.5 + 0.3v cross over around normal dance speed) while a still one
+// keeps the extra smoothing.
+const EURO_BETA = 0.5;
 const EURO_D_CUTOFF = 1.0;   // Hz: derivative smoothing
 const euro = { t: 0, x: null, dx: null, n: 0 };
 function lowpassAlpha(dt, cutoff) {
@@ -1220,7 +1232,21 @@ async function runFrame() {
             e.y < shoulderMidY + 0.05 && // the arm is genuinely raised
             w.y < e.y);                  // and the wrist continues upward
         const handVis = wristUsable(lms[15], lms[13]) || wristUsable(lms[16], lms[14]);
-        lastHandVis = handVis;
+        // A wrist hovering around the visibility threshold flips this several
+        // times a second, and any status driven straight off it strobes. The
+        // gates below still use the raw reading (a half-tracked frame is still
+        // bad evidence); only what the user READS is debounced. Slower to warn
+        // than to clear, so a brief dropout does not nag but fixing your
+        // framing is acknowledged promptly.
+        if (handVis === handsOk) {
+          handsSince = 0;
+        } else if (!handsSince) {
+          handsSince = now;
+        } else if (now - handsSince > (handVis ? HANDS_CLEAR_MS : HANDS_WARN_MS)) {
+          handsOk = handVis;
+          handsSince = 0;
+        }
+        lastHandVis = handsOk;
         if (teach) {
           teachStep(vec, hands, nearNow, now, handVis);
         } else if (currentTab === "perform" && !playback) {
@@ -1242,16 +1268,26 @@ async function runFrame() {
             // count less in matching.
             const conf = lms.map((p) => Math.max(0.2, Math.min(1, p?.visibility ?? 0.5)));
             performStep(vec, now, hands.left || hands.right, conf);
-            if (perfHandsLost) { perfHandsLost = false; setPerformState(); }
           } else {
             moving = false;      // a half-tracked move is not evidence
             stillSince = 0;
-            if (!perfHandsLost) {
-              perfHandsLost = true;
-              setBar(0);
-              hideClosest();
-            }
+          }
+          // Status is driven off the DEBOUNCED reading and written only when it
+          // changes. The warning used to run every frame while the other branch
+          // called setPerformState(), so the two strobed against each other.
+          // Only while continuously matching: calibration owns the status line
+          // while it counts down, and manual mode is not matching at all, so
+          // "matching is paused" would be untrue there.
+          if (bgCapture || triggerMode === "manual") {
+            perfHandsLost = false;
+          } else if (!handsOk && !perfHandsLost) {
+            perfHandsLost = true;
+            setBar(0);
+            hideClosest();
             statusEl.textContent = "Can't see your hands. Keep at least one hand in view; matching is paused.";
+          } else if (handsOk && perfHandsLost) {
+            perfHandsLost = false;
+            setPerformState();
           }
         }
         // Face target circle + R/L hand labels belong to Teach only. The
@@ -1359,7 +1395,11 @@ const perfBuf = [];               // {vec, t}
 let moving = false, moveStart = 0, lastActive = 0;
 let perfHandsLost = false;        // matching paused because no wrist is tracked
 let teachHandsLost = false;       // same warning, on the idle Teach tab
-let lastHandVis = false;          // is at least one wrist usable this frame
+let lastHandVis = true;           // debounced: are the hands usable, steadily
+let handsOk = true;               // the debounced state itself
+let handsSince = 0;               // when the raw reading started disagreeing
+const HANDS_WARN_MS = 600;        // hands must be gone this long to complain
+const HANDS_CLEAR_MS = 200;       // and back this long to stop
 
 // ---------- Background class (idle-movement calibration) ----------
 // The user records ~10s of their own ordinary movement (shifting, adjusting,
@@ -2283,7 +2323,7 @@ function updateCaptureOverlay(now) {
 function renderPhrase() {
   const chips = phrase.map((w) => `<span class="chip">${escapeHtml(w)}</span>`).join("");
   phraseEl.innerHTML = phrase.length === 0
-    ? '<span class="muted">Your matched words appear here…</span>'
+    ? '<span class="muted">Empty. Perform one of your codes and its word lands here.</span>'
     : chips;
   // Kiosk mode mirrors the phrase over the video so the audience reads it.
   const kp = document.getElementById("kioskPhrase");
@@ -2307,6 +2347,7 @@ function startTeach() {
     word, manual,
     state: manual ? "capturing" : "prime", // prime -> starting -> capturing
     frames: [], near: [], onface: [], holdSince: 0, canStopL: false, stopSince: 0,
+    offSince: 0, stopOffSince: 0,
     armed: false, // require the face to be uncovered once before starting
     startedAt: performance.now(),
   };
@@ -2321,7 +2362,7 @@ function startTeach() {
 
 // A hand may drop off the face for up to this long mid-hold (tracking flicker,
 // slight slip) without resetting the countdown. Longer gaps cancel it.
-const HOLD_GRACE_MS = 350;
+const HOLD_GRACE_MS = 700;
 // A hand must STAY on the face this long before any countdown appears, so a
 // hand merely passing over the face triggers nothing at all instead of
 // flashing a distracting countdown that instantly cancels.
@@ -2357,8 +2398,17 @@ function teachStep(vec, hands, near, now, handVis) {
     return;
   }
   if (t.state === "starting") {       // start countdown; leaving the face cancels it
-    if (hands.right) t.lastOn = now;
-    else if (now - t.lastOn > HOLD_GRACE_MS) { t.state = "prime"; return; }
+    if (hands.right) {
+      // Back on the face: the gap does not count against you. Advancing
+      // holdSince by its duration FREEZES the countdown across a dropout
+      // instead of letting it run down or restart, so a tracking blip costs
+      // you nothing. Only a real, sustained uncover cancels.
+      if (t.offSince) { t.holdSince += now - t.offSince; t.offSince = 0; }
+      t.lastOn = now;
+    } else {
+      if (!t.offSince) t.offSince = now;
+      if (now - t.lastOn > HOLD_GRACE_MS) { t.state = "prime"; t.offSince = 0; return; }
+    }
     if (now - t.holdSince >= START_HOLD_MS) {
       t.state = "capturing";
       t.frames = [vec]; t.near = [near]; t.onface = [hands.left || hands.right];
@@ -2385,10 +2435,13 @@ function teachStep(vec, hands, near, now, handVis) {
   const stopHeld = t.canStopL && hands.left && t.lOnSince && now - t.lOnSince >= ARM_DELAY_MS;
   if (stopHeld) {
     if (!t.stopSince) t.stopSince = now;
+    // Same freeze as the start countdown: a blip pauses, it does not reset.
+    if (t.stopOffSince) { t.stopSince += now - t.stopOffSince; t.stopOffSince = 0; }
     t.stopLastOn = now;
     if (now - t.stopSince >= STOP_HOLD_MS) finishTeach(now, false);
-  } else if (t.stopSince && now - t.stopLastOn > HOLD_GRACE_MS) {
-    t.stopSince = 0;
+  } else if (t.stopSince) {
+    if (!t.stopOffSince) t.stopOffSince = now;
+    if (now - t.stopLastOn > HOLD_GRACE_MS) { t.stopSince = 0; t.stopOffSince = 0; }
   }
 }
 
@@ -3725,7 +3778,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v58 (2026-08-06)");
+  console.log("AlgoDance build v61 (2026-08-06)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();

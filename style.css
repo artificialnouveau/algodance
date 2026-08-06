@@ -879,7 +879,7 @@ select {
 .teach-msg.ok { color: var(--ok); font-family: var(--font-hand); font-weight: 700; }
 .teach-msg.warn { color: var(--warn); font-family: var(--font-hand); font-weight: 700; }
 
-.code-list { list-style: none; margin: 8px 0; padding: 0; }
+.code-list { list-style: none; margin: 8px 0; padding: 0; max-width: 100%; }
 /* Every saved code is its own pasted card, alternating lean down the stack. */
 .code-item {
   background: var(--paper-2);
@@ -889,16 +889,24 @@ select {
   margin-bottom: 12px;
   box-shadow: var(--lift-1);
 }
-.code-item:nth-child(2n) { transform: rotate(-.5deg); }
-.code-item:nth-child(3n) { transform: rotate(.45deg); }
+.code-item:nth-child(2n) { transform: rotate(-.35deg); }
+.code-item:nth-child(3n) { transform: rotate(.3deg); }
 .code-item .word { font-family: var(--font-display); font-size: 19px; font-weight: 800; }
+/* The panel is a 300px column and this row carries four buttons plus the word,
+   which cannot fit side by side. The word takes the full width and the actions
+   wrap onto their own line beneath it. */
 .code-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
 }
+.code-info { min-width: 0; flex: 1 1 100%; }
+.code-item .word { overflow-wrap: anywhere; }
 .code-item .word { font-weight: 600; }
 .code-item .meta { font-size: 12px; color: var(--muted); }
-.row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+/* flex-shrink:0 kept these from ever giving way, so a row that could not fit
+   simply overflowed its card instead of wrapping. */
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .code-info { cursor: pointer; }
 .code-info:hover .word { text-decoration: underline; }
 
@@ -906,7 +914,9 @@ select {
 .example-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 4px 0;
+  flex-wrap: wrap;
 }
+.ex-name { min-width: 0; overflow-wrap: anywhere; }
 .ex-name { font-size: 13px; color: var(--text); }
 .ex-date { color: var(--muted); font-size: 11px; margin-left: 8px; }
 .btn.tiny { padding: 3px 9px; font-size: 12px; }
@@ -1255,7 +1265,6 @@ a:hover { color: var(--accent); }
 .intro-hint p { font-family: var(--font-hand); font-size: 14px; }
 @media (prefers-reduced-motion: reduce) { .intro-hint { transform: none; } }
 .intro-hint b { color: var(--accent); }
-.intro-hint .btn { flex-shrink: 0; }
 
 /* Reading pages (About / AlgoDance): hide the video stage, panel fills width. */
 .layout.content-full { grid-template-columns: 1fr; }

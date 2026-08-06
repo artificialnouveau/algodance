@@ -6,7 +6,7 @@
   <title>AlgoDance: Code a movement</title>
   <link rel="preload" href="fonts/bodoni-moda-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/courier-prime-latin-400.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="style.css?v=58" />
+  <link rel="stylesheet" href="style.css?v=61" />
 </head>
 <body>
   <!-- Collage furniture: printer's crop marks and a registration target, the
@@ -139,11 +139,12 @@
         <div class="transcript-head">
           <h3>Phrase</h3>
           <div class="row-actions">
-            <button id="speakPhrase" class="btn ghost small">Speak</button>
-            <button id="undoWord" class="btn ghost small">Undo</button>
-            <button id="clearPhrase" class="btn ghost small">Clear</button>
+            <button id="speakPhrase" class="btn ghost small" title="Read the whole phrase out loud">Read aloud</button>
+            <button id="undoWord" class="btn ghost small" title="Remove the last word">Undo</button>
+            <button id="clearPhrase" class="btn ghost small" title="Empty the phrase and start again">Clear</button>
           </div>
         </div>
+        <small class="muted">Every word you perform is added here, one after another, so a run of codes builds a sentence. Nothing is saved; it is just what you have said so far.</small>
         <div id="phrase" class="phrase" aria-live="polite"></div>
 
         <details class="more">
@@ -271,6 +272,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=58"></script>
+  <script type="module" src="app.js?v=61"></script>
 </body>
 </html>
