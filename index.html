@@ -4,7 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AlgoDance: Code a movement</title>
-  <link rel="stylesheet" href="style.css?v=57" />
+  <link rel="preload" href="fonts/bodoni-moda-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/courier-prime-latin-400.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="style.css?v=58" />
 </head>
 <body>
   <!-- Collage furniture: printer's crop marks and a registration target, the
@@ -246,7 +248,7 @@
           <li><b>Your camera stays on your device.</b> Video is processed frame by frame in the browser to detect body pose and is never uploaded, recorded, or stored. No video ever leaves your computer.</li>
           <li><b>Only coordinates are saved.</b> A saved code is just a short sequence of skeleton coordinates, stored in your browser's local storage. No images.</li>
           <li><b>You are in control.</b> Export or delete your codes anytime in the Codes tab. Clearing your browser storage removes everything.</li>
-          <li><b>Third-party models.</b> The pose models (MediaPipe BlazePose, and optionally MoveNet) download once from public CDNs so detection can run on your device. That is a normal file download; your camera data is not part of it.</li>
+          <li><b>Third-party models.</b> The pose models (MediaPipe BlazePose, and optionally MoveNet) download once from public CDNs so detection can run on your device. That is a normal file download; your camera data is not part of it. Everything else the page needs, including its fonts, is served from this site, so opening it tells no one else you did.</li>
         </ul>
 
         <h3>How it works</h3>
@@ -269,6 +271,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=57"></script>
+  <script type="module" src="app.js?v=58"></script>
 </body>
 </html>

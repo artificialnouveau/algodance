@@ -177,7 +177,11 @@ print run as the page around it.
   rather than glowing on black, plus ballpoint blue `#14417A` for hand-drawn
   marks. Ink `#1C1815` is the text colour.
 - **Type, three voices:** Bodoni Moda for headlines (cut from a magazine),
-  Courier Prime for labels and marginalia, Archivo for reading.
+  Courier Prime for labels and marginalia, Archivo for reading. Self-hosted
+  as latin-subset woff2 in `fonts/` (117KB, variable files where the family
+  has one): a webfont request would tell a third party the page was opened,
+  from which IP and when, which is exactly the claim the app makes about
+  itself.
 - **Joint markers print rather than glow:** each is a disc punched out of
   paper with a halftone screen inside, a cut ink edge, and a second ink pass
   a hair off register. Trails are opaque marker strokes, not additive light.
