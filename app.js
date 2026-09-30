@@ -2338,7 +2338,7 @@ function updateCaptureOverlay(now) {
 function renderPhrase() {
   const chips = phrase.map((w) => `<span class="chip">${escapeHtml(w)}</span>`).join("");
   phraseEl.innerHTML = phrase.length === 0
-    ? '<span class="muted">Empty. Perform one of your codes and its word lands here.</span>'
+    ? '<span class="muted">Empty. Perform one of your codes and its word or phrase lands here.</span>'
     : chips;
   // Kiosk mode mirrors the phrase over the video so the audience reads it.
   const kp = document.getElementById("kioskPhrase");
@@ -2565,9 +2565,9 @@ function finishTeach(now, timedOut = false) {
   let msg;
   if (n < 3) {
     recordBtn.textContent = `Record take ${n + 1} of 3`;
-    msg = `Take ${n} of 3 saved for “${t.word}”. Do the SAME movement again — three takes make it much more reliable. Just cover your face with your RIGHT hand to record the next take, no click needed.`;
+    msg = `Take ${n} of 3 saved for “${t.word}”. Do the SAME movement again; three takes make it much more reliable. Just cover your face with your RIGHT hand to record the next take, no click needed.`;
   } else {
-    msg = `“${t.word}” now has ${n} takes — nicely calibrated. Switch to Perform to try it, or type a new word.`;
+    msg = `“${t.word}” now has ${n} takes, nicely calibrated. Switch to Perform to try it, or type a new word or phrase.`;
   }
   // Follow-up takes arm hands-free: covering the face with the right hand
   // starts the next take of the SAME word without touching the mouse.
@@ -3765,18 +3765,18 @@ const tutBackBtn = document.getElementById("tutBack");
 const tutNextBtn = document.getElementById("tutNext");
 const tutExitBtn = document.getElementById("tutExit");
 const TUT_STEPS = [
-  { tab: "teach", on: "tracked",
-    text: "Step into view and take a few steps back, until glowing dots appear on your head, shoulders and hands. That is the computer seeing you." },
-  { tab: "teach", on: "word",
-    text: "Think of something to say with your body: hello, yes, I love you. Type it in the Word box in the panel." },
-  { tab: "teach", on: "recording",
-    text: "Click Record movement, then cover your face with your RIGHT hand (the big R) and hold still while it counts 3-2-1." },
-  { tab: "teach", on: "saved",
-    text: "Recording! Do one short move, four counts: 1, 2, 3, 4. Then cover your face with your LEFT hand (the big L) and hold to save." },
-  { tab: "perform", on: "performed",
-    text: "Saved! This is the Perform page. Dance your move again, just like you taught it, and watch what happens." },
-  { tab: "perform", on: null,
-    text: "You just said a word with your body. Record the same word two more times to make it stronger (Teach tab), or teach new words and dance whole sentences." },
+  { phase: "Teach", tab: "teach", on: "tracked",
+    text: "First, the camera needs to see you. Step back until glowing dots appear on your head, shoulders and hands." },
+  { phase: "Teach", tab: "teach", on: "word",
+    text: "Decide what your move will say: hello, yes, I love you. Type it in the Word or phrase box in the panel." },
+  { phase: "Teach", tab: "teach", on: "recording",
+    text: "Click Record movement. Then cover your face with your RIGHT hand (the big R) and hold still through the 3-2-1 countdown." },
+  { phase: "Teach", tab: "teach", on: "saved",
+    text: "You're recording: dance one short move, four counts, 1 2 3 4. Then cover your face with your LEFT hand (the big L) and hold to save it." },
+  { phase: "Perform", tab: "perform", on: "performed",
+    text: "Your move is saved, and this is the Perform page. Dance the same move again and the computer will say your word or phrase out loud." },
+  { phase: "Perform", tab: "perform", on: null,
+    text: "That's the whole loop: teach a move, then perform it. From here, teach more moves and dance whole sentences. Enjoy!" },
 ];
 let tut = null;             // {i, shownAt} while the guided tutorial is running
 let tutTrackTimer = null;   // poller for the "can it see you" step
@@ -3792,7 +3792,7 @@ function tutShow() {
   tut.shownAt = performance.now();
   const t = tabs.find((x) => x.dataset.tab === s.tab);
   if (t && currentTab !== s.tab) activateTab(t);
-  tutStepLabel.textContent = `Guide: step ${tut.i + 1} of ${TUT_STEPS.length}`;
+  tutStepLabel.textContent = `Guide: step ${tut.i + 1} of ${TUT_STEPS.length} (${s.phase})`;
   tutText.textContent = s.text;
   tutNextBtn.textContent = tut.i === TUT_STEPS.length - 1 ? "Finish" : "Next";
   tutBackBtn.disabled = tut.i === 0;

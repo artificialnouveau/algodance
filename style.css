@@ -852,8 +852,12 @@ select {
   transition: transform var(--dur-1) linear;
 }
 
-.transcript-head { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+/* The heading and its buttons share a row when they fit; when they don't,
+   the buttons drop to their OWN line (nowrap inside, wrap outside) instead
+   of folding one button onto the heading's underline. */
+.transcript-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; margin-top: 16px; }
 .transcript-head h3 { margin: 0; }
+.transcript-head .row-actions { flex-wrap: nowrap; margin-left: auto; }
 .phrase {
   margin-top: 10px;
   min-height: 62px;

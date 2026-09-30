@@ -6,7 +6,7 @@
   <title>AlgoDance: Code a movement</title>
   <link rel="preload" href="fonts/bodoni-moda-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/courier-prime-latin-400.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="style.css?v=68" />
+  <link rel="stylesheet" href="style.css?v=69" />
 </head>
 <body>
   <!-- Collage furniture: printer's crop marks and a registration target, the
@@ -132,7 +132,7 @@
       <!-- PERFORM -->
       <div class="tabpane" data-pane="perform" id="pane-perform" role="tabpanel" aria-labelledby="tab-perform" hidden>
         <h2>Perform</h2>
-        <p class="muted">Just perform. When a movement matches a saved code, its word appears above your head and joins the phrase below. Holding a pose for half a second counts too. <b>Keep at least one hand in view</b>, matching pauses while both are hidden.</p>
+        <p class="muted">Just perform. When a movement matches a saved code, its word or phrase appears above your head and joins the sentence below. Holding a pose for half a second counts too. <b>Keep at least one hand in view</b>, matching pauses while both are hidden.</p>
 
         <div id="warmupOffer" class="warmup" hidden>
           <span>Warm up first? Dance each of your codes once, with counts, before matching starts.</span>
@@ -154,14 +154,14 @@
         </div>
 
         <div class="transcript-head">
-          <h3>Phrase</h3>
+          <h3>Sentence</h3>
           <div class="row-actions">
-            <button id="speakPhrase" class="btn ghost small" title="Read the whole phrase out loud">Read aloud</button>
-            <button id="undoWord" class="btn ghost small" title="Remove the last word">Undo</button>
-            <button id="clearPhrase" class="btn ghost small" title="Empty the phrase and start again">Clear</button>
+            <button id="speakPhrase" class="btn ghost small" title="Read the whole sentence out loud">Read aloud</button>
+            <button id="undoWord" class="btn ghost small" title="Remove the last word or phrase">Undo</button>
+            <button id="clearPhrase" class="btn ghost small" title="Empty the sentence and start again">Clear</button>
           </div>
         </div>
-        <small class="muted">Every word you perform is added here, one after another, so a run of codes builds a sentence. It is only what you have said so far; use Clear to start a new one.</small>
+        <small class="muted">Every word or phrase you perform is added here, one after another, so a run of codes builds a sentence. It is only what you have said so far; use Clear to start a new one.</small>
         <div id="phrase" class="phrase" aria-live="polite"></div>
 
         <details class="more">
@@ -182,7 +182,7 @@
           <label class="field">
             <span>Sensitivity <em id="threshVal"></em></span>
             <input id="thresh" type="range" min="0.06" max="0.6" step="0.01" value="0.28" />
-            <small class="muted">Left = stricter, right = looser. Words with several examples auto-calibrate; this scales that.</small>
+            <small class="muted">Left = stricter, right = looser. Codes with several examples auto-calibrate; this scales that.</small>
           </label>
 
           <label class="field">
@@ -196,10 +196,10 @@
           <button id="holdBtn" class="btn block" hidden>Hold to capture (or Space)</button>
 
           <label class="check"><input type="checkbox" id="soundToggle" checked /> Ping on match</label>
-          <label class="check"><input type="checkbox" id="speakToggle" checked /> Speak matched words aloud</label>
+          <label class="check"><input type="checkbox" id="speakToggle" checked /> Speak the matched word or phrase aloud</label>
 
           <button id="bgBtn" class="btn small block">Calibrate my idle movement</button>
-          <small class="muted">Takes 10 seconds, once per algorithm: move around casually without performing any of your codes. Words then only fire when a movement resembles them more than your own idle movement.</small>
+          <small class="muted">Takes 10 seconds, once per algorithm: move around casually without performing any of your codes. Codes then only fire when a movement resembles them more than your own idle movement.</small>
 
           <button id="kioskBtn" class="btn ghost small block">Enter kiosk mode</button>
           <small class="muted">Fullscreen performance view for an installation: the camera fills the screen and every control disappears.</small>
@@ -214,21 +214,21 @@
       <!-- HOW IT WORKS: the opening page for visitors with nobody to explain -->
       <div class="tabpane" data-pane="howto" id="pane-howto" role="tabpanel" aria-labelledby="tab-howto">
         <h2>How it works</h2>
-        <p class="muted">AlgoDance is a crowdsourced movement dictionary: everyone who visits can add to it, including you. Invent a short move, teach it a word, and it joins the dictionary; then speak by dancing. Everything happens on this device; nothing is filmed or uploaded.</p>
+        <p class="muted">AlgoDance is a crowdsourced movement dictionary: everyone who visits can add to it, including you. Invent a short move, teach it a word or phrase, and it joins the dictionary; then speak by dancing. Everything happens on this device; nothing is filmed or uploaded.</p>
         <ol class="steps muted">
-          <li><b>Teach.</b> Type a word and record one short move for it, four counts long ("1, 2, 3, 4"). You start and stop the recording by covering your face with your right, then your left hand.</li>
-          <li><b>Perform.</b> Dance your move and the computer shows your word and says it out loud.</li>
-          <li><b>Build.</b> Teach more words and dance whole sentences. Your moves are saved on this computer, so they are still here tomorrow.</li>
+          <li><b>Teach.</b> Type a word or phrase and record one short move for it, four counts long ("1, 2, 3, 4"). You start and stop the recording by covering your face with your right, then your left hand.</li>
+          <li><b>Perform.</b> Dance your move and the computer shows your word or phrase and says it out loud.</li>
+          <li><b>Build.</b> Teach more moves and dance whole sentences. Your moves are saved on this computer, so they are still here tomorrow.</li>
         </ol>
         <button id="tutStartBtn" class="btn primary block">Guide me through it</button>
-        <p class="muted">The guide walks you through teaching and performing your first word, one step at a time.</p>
+        <p class="muted">The guide walks you through teaching and performing your first word or phrase, one step at a time.</p>
         <button id="tutSelfBtn" class="btn ghost block">I'll explore on my own</button>
       </div>
 
       <!-- TEACH -->
       <div class="tabpane" data-pane="teach" id="pane-teach" role="tabpanel" aria-labelledby="tab-teach" hidden>
         <h2>Teach a new code</h2>
-        <p id="teachHint" class="teach-hint"><b>Ready.</b> Type a word below and press <b>Record movement</b>. New here? The <b>How it works</b> tab walks you through it.</p>
+        <p id="teachHint" class="teach-hint"><b>Ready.</b> Type a word or phrase below and press <b>Record movement</b>. New here? The <b>How it works</b> tab walks you through it.</p>
 
         <label class="field">
           <span>Word or phrase</span>
@@ -245,7 +245,7 @@
           <li>Cover your face with your <b>right hand</b> (the big <b>R</b>) and hold for the 3-2-1 countdown. Recording starts at zero.</li>
           <li>Perform your move, then cover your face with your <b>left hand</b> (the big <b>L</b>) and hold for the 3-2-1 countdown to stop and save.</li>
         </ol>
-        <p class="muted">The hand-to-face moments are trimmed automatically, so only your movement is saved. Record the same word more than once to add examples and make it easier to recognize.</p>
+        <p class="muted">The hand-to-face moments are trimmed automatically, so only your movement is saved. Record the same word or phrase more than once to add examples and make it easier to recognize.</p>
 
         <label class="field">
           <span>Tempo</span>
@@ -264,14 +264,14 @@
           <input id="importFile" type="file" accept="application/json" hidden />
         </div>
         <p class="muted"><b>Export</b> saves all your moves as a small file (skeleton coordinates only, never video), so you can back them up or share them with someone. <b>Import</b> loads a file like that, yours or a friend's, and adds those moves to your own. <b>Delete all</b> wipes every saved code from this browser.</p>
-        <p class="muted">Your moves are saved on this computer or tablet, so they are still here tomorrow. They disappear if the browser's data is cleared, so use <b>Export</b> to keep a copy. Click a word (or Play all) to dance along with the ghost skeleton. When a word has several examples, each one can be played or deleted on its own.</p>
+        <p class="muted">Your moves are saved on this computer or tablet, so they are still here tomorrow. They disappear if the browser's data is cleared, so use <b>Export</b> to keep a copy. Click a word or phrase (or Play all) to dance along with the ghost skeleton. When a code has several examples, each one can be played or deleted on its own.</p>
         <ul id="codeList" class="code-list"></ul>
       </div>
 
       <!-- ABOUT -->
       <div class="tabpane" data-pane="about" id="pane-about" role="tabpanel" aria-labelledby="tab-about" hidden>
         <h2>About AlgoDance</h2>
-        <p class="muted">AlgoDance turns body movement into words. You teach the app a movement bound to a word or phrase, then perform it to make the word appear and be spoken.</p>
+        <p class="muted">AlgoDance turns body movement into words. You teach the app a movement bound to a word or phrase, then perform it to make that word or phrase appear and be spoken.</p>
 
         <h3>Your privacy</h3>
         <p class="muted">Everything happens locally, in your browser, on your device.</p>
@@ -303,6 +303,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=68"></script>
+  <script type="module" src="app.js?v=69"></script>
 </body>
 </html>
