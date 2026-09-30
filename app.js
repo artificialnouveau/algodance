@@ -3761,6 +3761,7 @@ tabs.forEach((tab) => {
 const tutCard = document.getElementById("tutCard");
 const tutStepLabel = document.getElementById("tutStepLabel");
 const tutText = document.getElementById("tutText");
+const tutBackBtn = document.getElementById("tutBack");
 const tutNextBtn = document.getElementById("tutNext");
 const tutExitBtn = document.getElementById("tutExit");
 const TUT_STEPS = [
@@ -3777,16 +3778,24 @@ const TUT_STEPS = [
   { tab: "perform", on: null,
     text: "You just said a word with your body. Record the same word two more times to make it stronger (Teach tab), or teach new words and dance whole sentences." },
 ];
-let tut = null;           // {i} while the guided tutorial is running
-let tutTrackTimer = null; // poller for the "can it see you" step
+let tut = null;             // {i, shownAt} while the guided tutorial is running
+let tutTrackTimer = null;   // poller for the "can it see you" step
+let tutAdvanceTimer = null; // pending auto-advance, held back for reading time
+// A step the visitor completes instantly (already standing in view, word
+// already typed) must still stay on screen long enough to be read before it
+// auto-advances; Next skips the wait.
+const TUT_MIN_READ_MS = 3500;
 
 function tutShow() {
+  clearTimeout(tutAdvanceTimer);
   const s = TUT_STEPS[tut.i];
+  tut.shownAt = performance.now();
   const t = tabs.find((x) => x.dataset.tab === s.tab);
   if (t && currentTab !== s.tab) activateTab(t);
   tutStepLabel.textContent = `Guide: step ${tut.i + 1} of ${TUT_STEPS.length}`;
   tutText.textContent = s.text;
   tutNextBtn.textContent = tut.i === TUT_STEPS.length - 1 ? "Finish" : "Next";
+  tutBackBtn.disabled = tut.i === 0;
   tutCard.hidden = false;
 }
 function tutAdvance() {
@@ -3795,14 +3804,30 @@ function tutAdvance() {
   tut.i++;
   tutShow();
 }
+function tutBack() {
+  if (!tut || tut.i === 0) return;
+  tut.i--;
+  tutShow();
+}
 function endTutorial() {
   tut = null;
   tutCard.hidden = true;
   clearInterval(tutTrackTimer);
   tutTrackTimer = null;
+  clearTimeout(tutAdvanceTimer);
+  tutAdvanceTimer = null;
 }
 function tutNotify(ev) {
-  if (tut && TUT_STEPS[tut.i].on === ev) tutAdvance();
+  if (!tut || TUT_STEPS[tut.i].on !== ev) return;
+  const waited = performance.now() - tut.shownAt;
+  if (waited >= TUT_MIN_READ_MS) { tutAdvance(); return; }
+  // Done before the step could be read: advance once it has been up long
+  // enough, unless the visitor moves through the steps themselves meanwhile.
+  clearTimeout(tutAdvanceTimer);
+  const stepAt = tut.i;
+  tutAdvanceTimer = setTimeout(() => {
+    if (tut && tut.i === stepAt) tutAdvance();
+  }, TUT_MIN_READ_MS - waited);
 }
 function startTutorial() {
   introHint.hidden = true; // one post-it at a time
@@ -3825,6 +3850,7 @@ function startTutorial() {
 }
 document.getElementById("tutStartBtn").addEventListener("click", startTutorial);
 document.getElementById("tutSelfBtn").addEventListener("click", () => activateTab(document.getElementById("tab-teach")));
+tutBackBtn.addEventListener("click", tutBack);
 tutNextBtn.addEventListener("click", tutAdvance);
 tutExitBtn.addEventListener("click", endTutorial);
 wordInput.addEventListener("input", () => {
