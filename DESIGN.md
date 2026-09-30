@@ -90,7 +90,10 @@ horizontal-centring gate exists because the pose tracks the wrist, which sits
 below the face when the palm covers it, so a radius alone cannot distinguish a
 palm over the face from a hand beside it. Both conditions use hysteresis (easier
 to enter than to leave) to stop boundary flicker. The face anchor averages whichever of nose/ears are visible,
-with a low visibility gate, because the covering hand itself occludes the nose.
+with a low visibility gate, because the covering hand itself occludes the nose,
+and is then dropped a quarter shoulder-width toward the chin: the wrist hangs
+at chin level when a palm covers the face, and an eye-level target made people
+reach up to their forehead to trigger it.
 The face was chosen over the hips because close framings often crop the hips or
 track them weakly, while the face stays solid. The app draws a **target circle
 over the face** that lights up when a wrist is close enough, so the threshold

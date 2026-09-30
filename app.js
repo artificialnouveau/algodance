@@ -266,6 +266,9 @@ const REST_EXIT = 0.72;   // distance to leave once on the face
 const CENTER_X_ENTER = 0.4; // |wrist.x - face.x| in shoulder widths to enter
 const CENTER_X_EXIT = 0.55; // and to stay (hysteresis)
 const FACE_LMS = [0, 7, 8]; // nose + ears
+// How far below the nose/ear centre the face target sits, in shoulder widths.
+// See the anchor computation in updateHandsOnFace.
+const REST_DROP_Y = 0.25;
 // The trip to and from the face is not part of the gesture. Frames at either
 // end of a capture where a wrist is within this radius of the face are
 // trimmed, so a code spans the movement itself, not the trigger transitions.
@@ -308,11 +311,17 @@ function updateHandsOnFace(lms, now) {
   restInfo = null;
   if ((ls?.visibility ?? 0) < 0.35 || (rs?.visibility ?? 0) < 0.35) return clearHandsOnFace();
   const face = FACE_LMS.map((i) => lms[i]).filter((p) => (p?.visibility ?? 0) > 0.15);
+  const scale = Math.hypot(ls.x - rs.x, ls.y - rs.y) || 1e-6; // shoulder width
   let anchor;
   if (face.length > 0) {
+    // The nose/ear average sits at eye level, but the tracked WRIST hangs at
+    // chin level when a palm covers the face, so an eye-level target made
+    // people reach up to their forehead to trigger it. Dropping the anchor
+    // (in shoulder widths) puts the circle over the mouth/chin, where a
+    // natural face-cover lands the wrist.
     anchor = {
       x: face.reduce((s, p) => s + p.x, 0) / face.length,
-      y: face.reduce((s, p) => s + p.y, 0) / face.length,
+      y: face.reduce((s, p) => s + p.y, 0) / face.length + REST_DROP_Y * scale,
     };
     lastFaceAnchor = { x: anchor.x, y: anchor.y, at: now };
   } else if (lastFaceAnchor && now - lastFaceAnchor.at < ANCHOR_STICKY_MS) {
@@ -320,7 +329,6 @@ function updateHandsOnFace(lms, now) {
   } else {
     return clearHandsOnFace();
   }
-  const scale = Math.hypot(ls.x - rs.x, ls.y - rs.y) || 1e-6; // shoulder width
   // A wrist counts as "on the face" only when it is close enough, roughly
   // under the face centre horizontally, AND its forearm points UP (wrist
   // clearly above its own elbow). A covering palm has a vertical forearm;
@@ -2291,13 +2299,14 @@ function updateCaptureOverlay(now) {
   // after a match/save. Driven here every frame so it can never stick on.
   videoWrap.classList.toggle("riso", kind === "rec" || now < risoFlashUntil);
 
-  // Teach on a beat: while recording, a steady metronome ticks an 8-count
-  // (reusing the tutorial numerals and dot strip) so movements are taught ON
-  // counts and play back the same way. It goes quiet during the stop
-  // hand-over-face countdown: that is bookkeeping, not dancing.
+  // Teach on a beat: while recording, a steady metronome counts "1 2 3 4"
+  // (reusing the tutorial numerals and a four-dot strip) so a code is taught
+  // as one four-count move, matching the instructions on the Teach tab. It
+  // goes quiet during the stop hand-over-face countdown: that is bookkeeping,
+  // not dancing. Playback keeps its full 8-count strip.
   if (teach && teach.state === "capturing" && teach.startedAt && !teach.stopSince && !playback) {
     const beatMs = 60000 / teachBpm();
-    const count = 1 + Math.floor((now - teach.startedAt) / beatMs) % 8;
+    const count = 1 + Math.floor((now - teach.startedAt) / beatMs) % 4;
     if (teach.lastBeat !== count) {
       teach.lastBeat = count;
       danceCount.hidden = false;
@@ -2306,15 +2315,17 @@ function updateCaptureOverlay(now) {
       void danceCount.offsetWidth;
       danceCount.classList.add("tick");
       countDots.hidden = false;
+      countDots.classList.add("four");
       const kids = countDots.children;
       for (let k = 0; k < kids.length; k++) {
         kids[k].className = k < count ? (k === count - 1 ? "cur" : "on") : "";
       }
-      countTick(count === 1 || count === 5);
+      countTick(count === 1);
     }
     teachCountsOn = true;
   } else if (teachCountsOn) {
     teachCountsOn = false;
+    countDots.classList.remove("four");
     if (!playback) { danceCount.hidden = true; countDots.hidden = true; }
   }
 
@@ -3646,10 +3657,29 @@ document.addEventListener("fullscreenchange", () => {
 headerToggle.addEventListener("click", () => {
   const collapsed = document.body.classList.toggle("header-collapsed");
   headerToggle.textContent = collapsed ? "Menu" : "Hide menu";
+  // The Back pill and the expanded header would overlap top-left; the header
+  // already offers every tab, so Back retires while the menu is open.
+  zineBackBtn.hidden = !collapsed;
+});
+
+// The zine's own way back: browser Back also works (see the history entries
+// in activateTab), but a visible button asks nothing of the visitor.
+const zineBackBtn = document.getElementById("zineBack");
+zineBackBtn.addEventListener("click", () => {
+  activateTab(document.getElementById("tab-teach"));
 });
 
 // ---------- UI wiring ----------
 const tabs = [...document.querySelectorAll(".tab")];
+let restoringTab = false; // a popstate is replaying history, not making it
+try { history.replaceState({ tab: "teach" }, ""); } catch {}
+window.addEventListener("popstate", (e) => {
+  const t = tabs.find((x) => x.dataset.tab === e.state?.tab);
+  if (!t) return;
+  restoringTab = true;
+  activateTab(t);
+  restoringTab = false;
+});
 function activateTab(tab, focus = false) {
   const name = tab.dataset.tab;
   currentTab = name;
@@ -3673,7 +3703,15 @@ function activateTab(tab, focus = false) {
   document.body.classList.toggle("header-collapsed", isZine);
   headerToggle.hidden = !isZine;
   headerToggle.textContent = "Menu";
+  zineBackBtn.hidden = !isZine;
   if (isZine) openZine();
+  // Each tab switch is a history entry, so the browser's Back button walks
+  // back through tabs instead of leaving the site entirely (the page is a
+  // single URL; without this, one press of Back lands on whatever came
+  // before AlgoDance, usually the search results).
+  if (!restoringTab && history.state?.tab !== name) {
+    try { history.pushState({ tab: name }, ""); } catch {}
+  }
   // Leaving the Teach tab mid-recording abandons it, so an active teach can
   // never keep "recording" (REC) into Perform. Also drop any manual capture.
   if (teach && name !== "teach") cancelTeach();

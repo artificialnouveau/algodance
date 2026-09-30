@@ -428,6 +428,8 @@ body.rot90 .video-wrap {
 }
 .count-dots i.on { background: rgba(236,255,0,.85); }
 .count-dots i.cur { background: #FF002A; box-shadow: 0 0 12px rgba(255,0,42,.9); }
+/* Teaching counts "1 2 3 4": the strip shows four dots, not eight. */
+.count-dots.four i:nth-child(n + 5) { display: none; }
 
 /* Playback practice controls (visible only while a code plays) */
 .pb-controls {
@@ -1108,6 +1110,8 @@ body.header-collapsed .zine { min-height: 100vh; }
   cursor: pointer;
 }
 .header-toggle:hover { border-color: var(--accent-2); }
+/* Same floating pill as Menu, but on the left: the way out of the zine. */
+.zine-back { right: auto; left: 12px; }
 
 /* The zine: one page at a time, lit against a dark room, flipped not scrolled. */
 .zine {
