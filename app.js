@@ -110,7 +110,7 @@ let backend = null;   // active pose backend (see backends.js)
 let ready = false;    // backend loaded and detecting
 let templates = loadTemplates();
 let teach = null;     // active teaching capture (movement-delimited)
-let currentTab = "teach"; // recognition runs ONLY while the Perform tab is active
+let currentTab = "howto"; // recognition runs ONLY while the Perform tab is active
 let lastFireAt = 0;
 let lastFiredWord = "";
 let phrase = [];
@@ -2181,6 +2181,7 @@ function fireWord(word, now) {
   if (!speak(word, reveal)) reveal(); // speech off or unavailable: show now
   phrase.push(word);
   renderPhrase();
+  tutNotify("performed");
 }
 
 // Speak text aloud with the Web Speech API. Cancels any in-progress speech so
@@ -2368,6 +2369,7 @@ function startTeach() {
   if (manual) {
     recordBtn.textContent = "Stop & save";
     setTeachMsg("Recording… click Stop & save when your movement is done.", "");
+    tutNotify("recording"); // manual mode skips the hand-over-face transition
   } else {
     recordBtn.textContent = "Cancel";
     setTeachMsg("Cover your face with your RIGHT hand (the big R) and hold for the 3-2-1 countdown to start. Perform, then cover your face with your LEFT hand (the big L) to stop and save.", "");
@@ -2429,6 +2431,7 @@ function teachStep(vec, hands, near, now, handVis) {
       t.handv = [!!handVis];
       t.startedAt = now;
       t.canStopL = false; t.stopSince = 0; t.stopLastOn = 0;
+      tutNotify("recording");
     }
     return;
   }
@@ -2572,6 +2575,7 @@ function finishTeach(now, timedOut = false) {
   rearmSince = 0;
   if (timedOut) msg += " (Recording hit its time cap; covering your face to finish was never detected.)";
   setTeachMsg(msg, "ok");
+  tutNotify("saved");
   // Keep the word so the next Record adds another example; select it for easy edit.
   wordInput.select();
 }
@@ -3672,7 +3676,7 @@ zineBackBtn.addEventListener("click", () => {
 // ---------- UI wiring ----------
 const tabs = [...document.querySelectorAll(".tab")];
 let restoringTab = false; // a popstate is replaying history, not making it
-try { history.replaceState({ tab: "teach" }, ""); } catch {}
+try { history.replaceState({ tab: "howto" }, ""); } catch {}
 window.addEventListener("popstate", (e) => {
   const t = tabs.find((x) => x.dataset.tab === e.state?.tab);
   if (!t) return;
@@ -3748,6 +3752,85 @@ tabs.forEach((tab) => {
     if (j >= 0) { e.preventDefault(); activateTab(tabs[j], true); }
   });
 });
+// ---------- Guided tutorial ----------
+// "Guide me through it" on the How-it-works tab: a post-it coach that walks a
+// first-time visitor through teaching and performing one word. Each step
+// advances by itself when the app sees the visitor do the thing (tutNotify
+// calls at the word input, recording start, save and first match); Next is
+// the manual escape for steps the tracker misses.
+const tutCard = document.getElementById("tutCard");
+const tutStepLabel = document.getElementById("tutStepLabel");
+const tutText = document.getElementById("tutText");
+const tutNextBtn = document.getElementById("tutNext");
+const tutExitBtn = document.getElementById("tutExit");
+const TUT_STEPS = [
+  { tab: "teach", on: "tracked",
+    text: "Step into view and take a few steps back, until glowing dots appear on your head, shoulders and hands. That is the computer seeing you." },
+  { tab: "teach", on: "word",
+    text: "Think of something to say with your body: hello, yes, I love you. Type it in the Word box in the panel." },
+  { tab: "teach", on: "recording",
+    text: "Click Record movement, then cover your face with your RIGHT hand (the big R) and hold still while it counts 3-2-1." },
+  { tab: "teach", on: "saved",
+    text: "Recording! Do one short move, four counts: 1, 2, 3, 4. Then cover your face with your LEFT hand (the big L) and hold to save." },
+  { tab: "perform", on: "performed",
+    text: "Saved! This is the Perform page. Dance your move again, just like you taught it, and watch what happens." },
+  { tab: "perform", on: null,
+    text: "You just said a word with your body. Record the same word two more times to make it stronger (Teach tab), or teach new words and dance whole sentences." },
+];
+let tut = null;           // {i} while the guided tutorial is running
+let tutTrackTimer = null; // poller for the "can it see you" step
+
+function tutShow() {
+  const s = TUT_STEPS[tut.i];
+  const t = tabs.find((x) => x.dataset.tab === s.tab);
+  if (t && currentTab !== s.tab) activateTab(t);
+  tutStepLabel.textContent = `Guide: step ${tut.i + 1} of ${TUT_STEPS.length}`;
+  tutText.textContent = s.text;
+  tutNextBtn.textContent = tut.i === TUT_STEPS.length - 1 ? "Finish" : "Next";
+  tutCard.hidden = false;
+}
+function tutAdvance() {
+  if (!tut) return;
+  if (tut.i >= TUT_STEPS.length - 1) { endTutorial(); return; }
+  tut.i++;
+  tutShow();
+}
+function endTutorial() {
+  tut = null;
+  tutCard.hidden = true;
+  clearInterval(tutTrackTimer);
+  tutTrackTimer = null;
+}
+function tutNotify(ev) {
+  if (tut && TUT_STEPS[tut.i].on === ev) tutAdvance();
+}
+function startTutorial() {
+  introHint.hidden = true; // one post-it at a time
+  warmupOffered = true;    // the guide replaces the Perform warm-up offer
+  tut = { i: 0 };
+  tutShow();
+  // The first step advances once a pose with a visible hand has been tracked
+  // steadily for a moment.
+  let okSince = 0;
+  clearInterval(tutTrackTimer);
+  tutTrackTimer = setInterval(() => {
+    if (!tut || TUT_STEPS[tut.i].on !== "tracked") return;
+    const now = performance.now();
+    const fresh = liveLmsNow && now - liveLmsNow.at < 700;
+    const seen = fresh && ((liveLmsNow.lms[15]?.visibility ?? 0) > 0.3 || (liveLmsNow.lms[16]?.visibility ?? 0) > 0.3);
+    if (!seen) { okSince = 0; return; }
+    if (!okSince) okSince = now;
+    if (now - okSince > 1200) tutNotify("tracked");
+  }, 300);
+}
+document.getElementById("tutStartBtn").addEventListener("click", startTutorial);
+document.getElementById("tutSelfBtn").addEventListener("click", () => activateTab(document.getElementById("tab-teach")));
+tutNextBtn.addEventListener("click", tutAdvance);
+tutExitBtn.addEventListener("click", endTutorial);
+wordInput.addEventListener("input", () => {
+  if (wordInput.value.trim().length >= 2) tutNotify("word");
+});
+
 threshInput.addEventListener("input", () => (threshVal.textContent = threshInput.value));
 recordBtn.addEventListener("click", () => {
   if (!teach) { startTeach(); return; }

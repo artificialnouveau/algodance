@@ -6,7 +6,7 @@
   <title>AlgoDance: Code a movement</title>
   <link rel="preload" href="fonts/bodoni-moda-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/courier-prime-latin-400.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="style.css?v=65" />
+  <link rel="stylesheet" href="style.css?v=66" />
 </head>
 <body>
   <!-- Collage furniture: printer's crop marks and a registration target, the
@@ -54,7 +54,8 @@
     <h1 class="logo" aria-label="AlgoDance"><span aria-hidden="true"><i style="color:#E40303">A</i><i style="color:#FF8C00">l</i><i style="color:#FFED00">g</i><i style="color:#008026">o</i><i style="color:#004DFF">D</i><i style="color:#750787">a</i><i style="color:#E40303">n</i><i style="color:#FF8C00">c</i><i style="color:#008026">e</i></span></h1>
     <p class="tagline">Code a movement.</p>
     <nav class="tabs" role="tablist" aria-label="Sections">
-      <button class="tab is-active" data-tab="teach" role="tab" id="tab-teach" aria-controls="pane-teach" aria-selected="true">Teach</button>
+      <button class="tab is-active" data-tab="howto" role="tab" id="tab-howto" aria-controls="pane-howto" aria-selected="true">How it works</button>
+      <button class="tab" data-tab="teach" role="tab" id="tab-teach" aria-controls="pane-teach" aria-selected="false" tabindex="-1">Teach</button>
       <button class="tab" data-tab="perform" role="tab" id="tab-perform" aria-controls="pane-perform" aria-selected="false" tabindex="-1">Perform</button>
       <button class="tab" data-tab="codes" role="tab" id="tab-codes" aria-controls="pane-codes" aria-selected="false" tabindex="-1">Codes</button>
       <button class="tab" data-tab="about" role="tab" id="tab-about" aria-controls="pane-about" aria-selected="false" tabindex="-1">About</button>
@@ -67,6 +68,18 @@
       <div id="introHint" class="intro-hint" hidden>
         <p>Stand back so your <b>head, shoulders and hands</b> are in view. When glowing dots appear on your joints, you're being tracked; your head, hands and feet leave light trails as you move.</p>
         <button id="introDismiss" class="btn small">Got it</button>
+      </div>
+
+      <!-- Guided-tutorial coach: one instruction at a time, over the video.
+           Steps advance by themselves when the app sees the visitor do the
+           thing; Next is the manual escape. -->
+      <div id="tutCard" class="intro-hint tut-card" hidden>
+        <div id="tutStepLabel" class="tut-step"></div>
+        <p id="tutText"></p>
+        <div class="tut-actions">
+          <button id="tutNext" class="btn small">Next</button>
+          <button id="tutExit" class="btn ghost small">Exit guide</button>
+        </div>
       </div>
 
       <div class="video-wrap">
@@ -197,10 +210,24 @@
         </details>
       </div>
 
+      <!-- HOW IT WORKS: the opening page for visitors with nobody to explain -->
+      <div class="tabpane" data-pane="howto" id="pane-howto" role="tabpanel" aria-labelledby="tab-howto">
+        <h2>How it works</h2>
+        <p class="muted">AlgoDance is a movement dictionary you fill yourself. You invent short moves, teach each one a word, and then speak by dancing. Everything happens on this device; nothing is filmed or uploaded.</p>
+        <ol class="steps muted">
+          <li><b>Teach.</b> Type a word and record one short move for it, four counts long ("1, 2, 3, 4"). You start and stop the recording by covering your face with your right, then your left hand.</li>
+          <li><b>Perform.</b> Dance your move and the computer shows your word and says it out loud.</li>
+          <li><b>Build.</b> Teach more words and dance whole sentences. Your moves are saved on this computer, so they are still here tomorrow.</li>
+        </ol>
+        <button id="tutStartBtn" class="btn primary block">Guide me through it</button>
+        <p class="muted">The guide walks you through teaching and performing your first word, one step at a time.</p>
+        <button id="tutSelfBtn" class="btn ghost block">I'll explore on my own</button>
+      </div>
+
       <!-- TEACH -->
-      <div class="tabpane" data-pane="teach" id="pane-teach" role="tabpanel" aria-labelledby="tab-teach">
+      <div class="tabpane" data-pane="teach" id="pane-teach" role="tabpanel" aria-labelledby="tab-teach" hidden>
         <h2>Teach a new code</h2>
-        <p id="teachHint" class="teach-hint"><b>How it works:</b> AlgoDance is a movement dictionary you fill yourself. Invent one short move and teach it a word; the computer then says that word whenever you dance the move. Type a word below, press <b>Record movement</b>, and follow the instructions on the camera. Your move is saved on this device only; nothing is filmed or uploaded.</p>
+        <p id="teachHint" class="teach-hint"><b>Ready.</b> Type a word below and press <b>Record movement</b>. New here? The <b>How it works</b> tab walks you through it.</p>
 
         <label class="field">
           <span>Word or phrase</span>
@@ -275,6 +302,6 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=65"></script>
+  <script type="module" src="app.js?v=66"></script>
 </body>
 </html>
