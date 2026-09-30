@@ -1293,6 +1293,8 @@ a:hover { color: var(--accent); }
   margin-bottom: 6px;
 }
 .tut-actions { display: flex; gap: 8px; }
+/* A card's text may carry its own line breaks (the recording checklist). */
+#tutText { white-space: pre-line; }
 @media (prefers-reduced-motion: reduce) { .tut-card { transform: none; } }
 
 /* Reading pages (About / AlgoDance): hide the video stage, panel fills width. */

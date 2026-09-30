@@ -3825,10 +3825,12 @@ const TUT_STEPS = [
     text: "The dictionary already holds one move, called AlgoDance: the white ghost is dancing it now. Both arms sweep up overhead and back down, in four counts. Dance along! You'll teach your own move the same way." },
   { phase: "Teach", tab: "teach", on: "word",
     text: "Decide what your move will say: hello, yes, I love you. Type it in the Word or phrase box in the panel." },
-  { phase: "Teach", tab: "teach", on: "recording",
-    text: "Click Record movement. Then cover your face with your RIGHT hand (the big R) and hold still through the 3-2-1 countdown." },
+  // One card for the whole recording, read BEFORE it starts: a card switch
+  // mid-recording meant the reading pause was recorded as part of the move.
+  // The on-video prompts (countdown, REC, metronome) take over during the act.
   { phase: "Teach", tab: "teach", on: "saved", lock: true,
-    text: "You're recording: dance one short move, four counts, 1 2 3 4. Then cover your face with your LEFT hand (the big L) and hold to save it." },
+    lockHint: "Record and save your move first; this card moves on by itself",
+    text: "Read this first, then click Record movement.\n1. Cover your face with your RIGHT hand (the big R), hold for 3-2-1.\n2. Dance your move, four counts: 1 2 3 4.\n3. Cover your face with your LEFT hand (the big L), hold to save.\nThe hand-on-face moments are not part of your move; they are trimmed off." },
   { phase: "Perform", tab: "perform", on: "performed",
     text: "Your move is saved, and this is the Perform page. Dance the same move again and the computer will say your word or phrase out loud." },
   { phase: "Perform", tab: "perform", on: null,
@@ -3866,7 +3868,7 @@ function tutShow() {
   // A locked step cannot be skipped: it advances only when the thing itself
   // happens (saving the move with the LEFT hand over the face).
   tutNextBtn.disabled = !!s.lock;
-  tutNextBtn.title = s.lock ? "Save your move first: cover your face with your LEFT hand and hold" : "";
+  tutNextBtn.title = s.lock ? s.lockHint || "" : "";
   tutBackBtn.disabled = tut.i === 0;
   tutCard.hidden = false;
 }
