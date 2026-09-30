@@ -371,23 +371,53 @@ function isNearFace() {
   return restInfo ? restInfo.d < NEAR_FACE_R : false;
 }
 
-// Visual guide: a circle over the face that lights up when a wrist is close
-// enough to count as "hand over face". Lets the performer see the target
-// instead of guessing at an invisible threshold.
+// Visual guide: a face-shaped target over the face that lights up when a
+// wrist is close enough to count as "hand over face". A white mask in the
+// shape of a face, with a minimalist one-line face drawn on it (browline,
+// nose, lips), instead of an anonymous circle: the shape itself says "this
+// is a face, cover it". The detection geometry is unchanged; this is only
+// how the threshold is shown.
 function drawRestTargets() {
   if (!restInfo) return;
   const { anchor, scale, on } = restInfo;
   const r = REST_ENTER * scale * overlay.width * 0.9;
-  const inRange = on;
+  const u = r * 0.8;   // face half-width
+  const v = r * 1.05;  // face half-height
+  octx.save();
+  octx.translate(anchor.x * overlay.width, anchor.y * overlay.height);
+  octx.lineJoin = "round";
+  octx.lineCap = "round";
+  // The mask: an egg, full at the crown, tapering to the chin.
   octx.beginPath();
-  octx.arc(anchor.x * overlay.width, anchor.y * overlay.height, r, 0, Math.PI * 2);
-  octx.strokeStyle = inRange ? "rgba(236,255,0,0.95)" : "rgba(255,255,255,0.5)";
-  octx.lineWidth = inRange ? 4 : 2;
+  octx.moveTo(0, -v);
+  octx.bezierCurveTo(u * 0.95, -v, u, -v * 0.1, u * 0.72, v * 0.45);
+  octx.bezierCurveTo(u * 0.5, v * 0.92, u * 0.22, v, 0, v);
+  octx.bezierCurveTo(-u * 0.22, v, -u * 0.5, v * 0.92, -u * 0.72, v * 0.45);
+  octx.bezierCurveTo(-u, -v * 0.1, -u * 0.95, -v, 0, -v);
+  octx.closePath();
+  octx.fillStyle = on ? "rgba(236,255,0,0.35)" : "rgba(255,255,255,0.5)";
+  octx.fill();
+  octx.strokeStyle = on ? "rgba(236,255,0,0.95)" : "rgba(255,255,255,0.75)";
+  octx.lineWidth = on ? 4 : 2.5;
   octx.stroke();
-  if (inRange) {
-    octx.fillStyle = "rgba(236,255,0,0.15)";
-    octx.fill();
-  }
+  // The one-line face, ink on the mask: a two-arch browline, a nose stroke
+  // curling into a nostril, and upper and lower lip strokes.
+  octx.strokeStyle = "rgba(24,20,16,0.8)";
+  octx.lineWidth = Math.max(2, r * 0.045);
+  octx.beginPath();
+  octx.moveTo(-0.5 * u, -0.28 * v);
+  octx.bezierCurveTo(-0.3 * u, -0.44 * v, -0.1 * u, -0.4 * v, 0.02 * u, -0.33 * v);
+  octx.bezierCurveTo(0.18 * u, -0.44 * v, 0.38 * u, -0.42 * v, 0.5 * u, -0.3 * v);
+  octx.moveTo(0.02 * u, -0.3 * v);
+  octx.bezierCurveTo(0.08 * u, -0.1 * v, 0.14 * u, 0.05 * v, 0.05 * u, 0.14 * v);
+  octx.bezierCurveTo(-0.04 * u, 0.2 * v, -0.1 * u, 0.12 * v, -0.05 * u, 0.07 * v);
+  octx.moveTo(-0.26 * u, 0.48 * v);
+  octx.bezierCurveTo(-0.1 * u, 0.4 * v, -0.04 * u, 0.44 * v, 0, 0.44 * v);
+  octx.bezierCurveTo(0.04 * u, 0.44 * v, 0.1 * u, 0.4 * v, 0.26 * u, 0.48 * v);
+  octx.moveTo(-0.2 * u, 0.56 * v);
+  octx.bezierCurveTo(-0.07 * u, 0.66 * v, 0.07 * u, 0.66 * v, 0.2 * u, 0.56 * v);
+  octx.stroke();
+  octx.restore();
 }
 
 // Big R / L letters on the wrists during a teach: RIGHT hand starts the
