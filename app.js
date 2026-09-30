@@ -371,12 +371,41 @@ function isNearFace() {
   return restInfo ? restInfo.d < NEAR_FACE_R : false;
 }
 
-// Visual guide: a face-shaped target over the face that lights up when a
-// wrist is close enough to count as "hand over face". A white mask in the
-// shape of a face, with a minimalist one-line face drawn on it (browline,
-// nose, lips), instead of an anonymous circle: the shape itself says "this
-// is a face, cover it". The detection geometry is unchanged; this is only
-// how the threshold is shown.
+// ---- The one-line face ----
+// An egg-shaped mask tapering to the chin, with a minimalist continuous-line
+// face inked on it: a browline flowing into a nose stroke that curls at the
+// nostril, and two lip strokes. Shared by the head presence mark (drawn
+// whenever a body is tracked) and the teach hand-over-face target, so the
+// face reads as the same printed object everywhere. Both paths trace around
+// (0,0); the caller translates, fills and strokes.
+function traceFaceEgg(ctx, u, v) {
+  ctx.beginPath();
+  ctx.moveTo(0, -v);
+  ctx.bezierCurveTo(u * 0.95, -v, u, -v * 0.1, u * 0.72, v * 0.45);
+  ctx.bezierCurveTo(u * 0.5, v * 0.92, u * 0.22, v, 0, v);
+  ctx.bezierCurveTo(-u * 0.22, v, -u * 0.5, v * 0.92, -u * 0.72, v * 0.45);
+  ctx.bezierCurveTo(-u, -v * 0.1, -u * 0.95, -v, 0, -v);
+  ctx.closePath();
+}
+function traceFaceLines(ctx, u, v) {
+  ctx.beginPath();
+  ctx.moveTo(-0.5 * u, -0.28 * v);
+  ctx.bezierCurveTo(-0.3 * u, -0.44 * v, -0.1 * u, -0.4 * v, 0.02 * u, -0.33 * v);
+  ctx.bezierCurveTo(0.18 * u, -0.44 * v, 0.38 * u, -0.42 * v, 0.5 * u, -0.3 * v);
+  ctx.moveTo(0.02 * u, -0.3 * v);
+  ctx.bezierCurveTo(0.08 * u, -0.1 * v, 0.14 * u, 0.05 * v, 0.05 * u, 0.14 * v);
+  ctx.bezierCurveTo(-0.04 * u, 0.2 * v, -0.1 * u, 0.12 * v, -0.05 * u, 0.07 * v);
+  ctx.moveTo(-0.26 * u, 0.48 * v);
+  ctx.bezierCurveTo(-0.1 * u, 0.4 * v, -0.04 * u, 0.44 * v, 0, 0.44 * v);
+  ctx.bezierCurveTo(0.04 * u, 0.44 * v, 0.1 * u, 0.4 * v, 0.26 * u, 0.48 * v);
+  ctx.moveTo(-0.2 * u, 0.56 * v);
+  ctx.bezierCurveTo(-0.07 * u, 0.66 * v, 0.07 * u, 0.66 * v, 0.2 * u, 0.56 * v);
+}
+
+// Visual guide: the face target that lights up when a wrist is close enough
+// to count as "hand over face". The one-line face instead of an anonymous
+// circle: the shape itself says "this is a face, cover it". The detection
+// geometry is unchanged; this is only how the threshold is shown.
 function drawRestTargets() {
   if (!restInfo) return;
   const { anchor, scale, on } = restInfo;
@@ -387,35 +416,15 @@ function drawRestTargets() {
   octx.translate(anchor.x * overlay.width, anchor.y * overlay.height);
   octx.lineJoin = "round";
   octx.lineCap = "round";
-  // The mask: an egg, full at the crown, tapering to the chin.
-  octx.beginPath();
-  octx.moveTo(0, -v);
-  octx.bezierCurveTo(u * 0.95, -v, u, -v * 0.1, u * 0.72, v * 0.45);
-  octx.bezierCurveTo(u * 0.5, v * 0.92, u * 0.22, v, 0, v);
-  octx.bezierCurveTo(-u * 0.22, v, -u * 0.5, v * 0.92, -u * 0.72, v * 0.45);
-  octx.bezierCurveTo(-u, -v * 0.1, -u * 0.95, -v, 0, -v);
-  octx.closePath();
+  traceFaceEgg(octx, u, v);
   octx.fillStyle = on ? "rgba(236,255,0,0.35)" : "rgba(255,255,255,0.5)";
   octx.fill();
   octx.strokeStyle = on ? "rgba(236,255,0,0.95)" : "rgba(255,255,255,0.75)";
   octx.lineWidth = on ? 4 : 2.5;
   octx.stroke();
-  // The one-line face, ink on the mask: a two-arch browline, a nose stroke
-  // curling into a nostril, and upper and lower lip strokes.
   octx.strokeStyle = "rgba(24,20,16,0.8)";
   octx.lineWidth = Math.max(2, r * 0.045);
-  octx.beginPath();
-  octx.moveTo(-0.5 * u, -0.28 * v);
-  octx.bezierCurveTo(-0.3 * u, -0.44 * v, -0.1 * u, -0.4 * v, 0.02 * u, -0.33 * v);
-  octx.bezierCurveTo(0.18 * u, -0.44 * v, 0.38 * u, -0.42 * v, 0.5 * u, -0.3 * v);
-  octx.moveTo(0.02 * u, -0.3 * v);
-  octx.bezierCurveTo(0.08 * u, -0.1 * v, 0.14 * u, 0.05 * v, 0.05 * u, 0.14 * v);
-  octx.bezierCurveTo(-0.04 * u, 0.2 * v, -0.1 * u, 0.12 * v, -0.05 * u, 0.07 * v);
-  octx.moveTo(-0.26 * u, 0.48 * v);
-  octx.bezierCurveTo(-0.1 * u, 0.4 * v, -0.04 * u, 0.44 * v, 0, 0.44 * v);
-  octx.bezierCurveTo(0.04 * u, 0.44 * v, 0.1 * u, 0.4 * v, 0.26 * u, 0.48 * v);
-  octx.moveTo(-0.2 * u, 0.56 * v);
-  octx.bezierCurveTo(-0.07 * u, 0.66 * v, 0.07 * u, 0.66 * v, 0.2 * u, 0.56 * v);
+  traceFaceLines(octx, u, v);
   octx.stroke();
   octx.restore();
 }
@@ -1043,12 +1052,55 @@ function drawPresence(lms, now) {
       // then the punched-out halftone disc on top of it.
       const off = Math.max(1.5, r * 0.16);
       octx.globalCompositeOperation = "source-over";
+      if (o.i === 0) {
+        // The head mark is not a disc but the one-line face: the same print
+        // recipe (ink pass off register, paper on top, cut edge), with the
+        // minimalist face inked on the paper.
+        const u = r * 0.95, v = r * 1.25;
+        octx.save();
+        octx.translate(p.x, p.y);
+        octx.lineJoin = "round";
+        octx.lineCap = "round";
+        octx.fillStyle = `rgba(${o.rgb},0.9)`;
+        octx.save();
+        octx.translate(off, off * 0.85);
+        traceFaceEgg(octx, u, v);
+        octx.fill();
+        octx.restore();
+        traceFaceEgg(octx, u, v);
+        octx.fillStyle = "#F4EEE0";
+        octx.fill();
+        octx.strokeStyle = "rgba(28,24,21,.92)";
+        octx.lineWidth = 2.2;
+        octx.stroke();
+        octx.strokeStyle = "rgba(28,24,21,.85)";
+        octx.lineWidth = Math.max(1.6, r * 0.08);
+        traceFaceLines(octx, u, v);
+        octx.stroke();
+        octx.restore();
+        continue;
+      }
       octx.fillStyle = `rgba(${o.rgb},0.9)`;
       octx.beginPath();
       octx.arc(p.x + off, p.y + off * 0.85, r * 0.82, 0, TAU);
       octx.fill();
       const st = inkStamp(o.rgb);
       octx.drawImage(st, p.x - r * 0.82, p.y - r * 0.82, r * 1.64, r * 1.64);
+      // The wrist discs carry their letter: R on the subject's right hand
+      // (starts a recording), L on the left (stops and saves), so the teach
+      // instructions always have something on screen to point at. Drawn
+      // locally flipped to cancel the CSS mirror, like every other letter.
+      if (o.i === 15 || o.i === 16) {
+        octx.save();
+        octx.translate(p.x, p.y);
+        octx.scale(-1, 1);
+        octx.font = `900 ${Math.max(10, Math.round(r * 0.95))}px system-ui, sans-serif`;
+        octx.textAlign = "center";
+        octx.textBaseline = "middle";
+        octx.fillStyle = "rgba(28,24,21,.92)";
+        octx.fillText(o.i === 16 ? "R" : "L", 0, 1);
+        octx.restore();
+      }
     }
   }
   octx.restore();
