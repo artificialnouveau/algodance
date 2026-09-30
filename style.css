@@ -278,6 +278,7 @@ body {
 
 .stage {
   min-width: 0;
+  position: relative; /* anchors the floating first-run post-it */
   /* A column that measures itself. The post-it, the status bar and the
      algorithm row take the height they need; the video takes what is left.
      This replaced a hardcoded "100vh - 280px", which was calibrated against an
@@ -1243,13 +1244,17 @@ a:hover { color: var(--accent); }
 }
 
 /* First-run framing hint */
-/* A post-it stuck next to the screen, not a label pasted over the performer.
-   Lives in the stage above the video so it never covers anyone. */
+/* A post-it stuck on the corner of the photo. It used to sit in the stage
+   column above the video, but its height came straight out of the video,
+   which could shrink to a letterbox strip; it is dismissible and first-run
+   only, so floating over the picture costs less than hiding the performer. */
 .intro-hint {
-  position: relative;
-  flex: 0 0 auto;
-  width: min(340px, 100%);
-  margin: 0 0 12px;
+  position: absolute;
+  top: 10px;
+  left: 16px;
+  z-index: 5;
+  width: min(340px, calc(100% - 32px));
+  margin: 0;
   display: block;
   padding: 15px 17px 13px;
   /* Post-it stock: soft canary, a touch deeper toward the bottom where the
