@@ -574,6 +574,60 @@ let currentFamily = ALGOS[algoChoice].family;
 
 function connectionsForFamily(fam) { return fam === "blaze" ? BLAZE_CONNECTIONS : COCO_CONNECTIONS; }
 
+// ---------- The built-in "AlgoDance" code ----------
+// The dictionary should never greet a visitor empty: whenever there are no
+// codes at all (first visit, or a wiped browser), it is seeded with one
+// move named "AlgoDance": both arms sweep out and up overhead on counts 1-2
+// and back down on 3-4. The skeleton is generated, not recorded, in the
+// same normalized space as a taught code (hip-midpoint origin, torso length
+// 1, y growing downward), and symmetric so mirroring cannot misread it.
+// The guide plays it as the example to copy; it is also performable and
+// deletable like any other code, and stays deleted while other codes exist.
+function algoDanceSeed() {
+  const frames = [];
+  const N = 24;
+  for (let f = 0; f < N; f++) {
+    const t = f / (N - 1);
+    const up = t < 0.5 ? t * 2 : (1 - t) * 2;      // 0 hanging, 1 overhead
+    const a = 0.12 + up * (Math.PI * 0.92 - 0.12); // arm angle from straight down
+    const v = new Array(NUM_LMS * 2).fill(0);
+    const set = (i, x, y) => { v[i * 2] = x; v[i * 2 + 1] = y; };
+    set(0, 0, -1.5);                                                  // nose
+    set(1, 0.05, -1.56); set(2, 0.08, -1.56); set(3, 0.11, -1.56);    // left eye
+    set(4, -0.05, -1.56); set(5, -0.08, -1.56); set(6, -0.11, -1.56); // right eye
+    set(7, 0.15, -1.52); set(8, -0.15, -1.52);                        // ears
+    set(9, 0.05, -1.4); set(10, -0.05, -1.4);                         // mouth
+    set(11, 0.28, -1); set(12, -0.28, -1);                            // shoulders
+    set(23, 0.18, 0); set(24, -0.18, 0);                              // hips
+    set(25, 0.2, 0.9); set(26, -0.2, 0.9);                            // knees
+    set(27, 0.21, 1.8); set(28, -0.21, 1.8);                          // ankles
+    set(29, 0.23, 1.9); set(30, -0.23, 1.9);                          // heels
+    set(31, 0.17, 1.98); set(32, -0.17, 1.98);                        // toes
+    for (const side of [1, -1]) { // arms, mirrored left/right
+      const dx = Math.sin(a) * side, dy = Math.cos(a);
+      const ex = 0.28 * side + 0.5 * dx, ey = -1 + 0.5 * dy; // elbow
+      const wx = ex + 0.45 * dx, wy = ey + 0.45 * dy;        // wrist
+      const o = side === 1 ? 0 : 1;
+      set(13 + o, ex, ey);
+      set(15 + o, wx, wy);
+      set(17 + o, wx + 0.12 * dx, wy + 0.12 * dy); // pinky
+      set(19 + o, wx + 0.13 * dx, wy + 0.13 * dy); // index
+      set(21 + o, wx + 0.1 * dx, wy + 0.1 * dy);   // thumb
+    }
+    frames.push(v);
+  }
+  const beat = 60000 / DEFAULT_BPM;
+  return {
+    id: "seed-algodance", word: "AlgoDance",
+    seq: resampleSeq(frames, FIXED_LEN), durMs: Math.round(beat * 4),
+    family: "blaze", algo: "blaze-full", createdAt: Date.now(), sq: 1, bpm: DEFAULT_BPM,
+  };
+}
+if (templates.length === 0) {
+  templates.push(algoDanceSeed());
+  try { saveTemplates(); } catch {}
+}
+
 async function initPose() {
   backend = createBackend(algoChoice);
   await backend.load();
@@ -3767,6 +3821,8 @@ const tutExitBtn = document.getElementById("tutExit");
 const TUT_STEPS = [
   { phase: "Teach", tab: "teach", on: "tracked",
     text: "First, the camera needs to see you. Step back until glowing dots appear on your head, shoulders and hands." },
+  { phase: "Teach", tab: "teach", on: null, demo: true,
+    text: "The dictionary already holds one move, called AlgoDance: the white ghost is dancing it now. Both arms sweep up overhead and back down, in four counts. Dance along! You'll teach your own move the same way." },
   { phase: "Teach", tab: "teach", on: "word",
     text: "Decide what your move will say: hello, yes, I love you. Type it in the Word or phrase box in the panel." },
   { phase: "Teach", tab: "teach", on: "recording",
@@ -3786,12 +3842,24 @@ let tutAdvanceTimer = null; // pending auto-advance, held back for reading time
 // auto-advances; Next skips the wait.
 const TUT_MIN_READ_MS = 3500;
 
+// The demo step loops the built-in AlgoDance code as a ghost to dance along
+// with; any other step (and leaving the guide) stops it.
+function startDemoGhost() {
+  const items = templates.filter((x) => x.word.toLowerCase() === "algodance");
+  startPlaybackItems(items.length ? playbackReps(items) : [algoDanceSeed()], "AlgoDance", "demo");
+  pbLoop = true; // repeat until the visitor moves on
+}
+function stopDemoGhost() {
+  if (playback?.key === "demo") stopPlayback();
+}
+
 function tutShow() {
   clearTimeout(tutAdvanceTimer);
   const s = TUT_STEPS[tut.i];
   tut.shownAt = performance.now();
   const t = tabs.find((x) => x.dataset.tab === s.tab);
   if (t && currentTab !== s.tab) activateTab(t);
+  if (s.demo) startDemoGhost(); else stopDemoGhost();
   tutStepLabel.textContent = `Guide: step ${tut.i + 1} of ${TUT_STEPS.length} (${s.phase})`;
   tutText.textContent = s.text;
   tutNextBtn.textContent = tut.i === TUT_STEPS.length - 1 ? "Finish" : "Next";
@@ -3810,6 +3878,7 @@ function tutBack() {
   tutShow();
 }
 function endTutorial() {
+  stopDemoGhost();
   tut = null;
   tutCard.hidden = true;
   clearInterval(tutTrackTimer);
