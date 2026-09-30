@@ -298,7 +298,7 @@ const UNSEEN_STICKY_MS = 600;
 // while a palm covers it), remembered for up to this long.
 const ANCHOR_STICKY_MS = 1500;
 let lastFaceAnchor = null; // {x, y, at}
-let restInfo = null;       // per-frame info for drawing the face target circle
+let restInfo = null;       // per-frame info for the head mark's hand-over-face glow
 
 function clearHandsOnFace() {
   handOnFace.left.on = handOnFace.right.on = false;
@@ -373,11 +373,11 @@ function isNearFace() {
 
 // ---- The one-line face ----
 // An egg-shaped mask tapering to the chin, with a minimalist continuous-line
-// face inked on it: a browline flowing into a nose stroke that curls at the
-// nostril, and two lip strokes. Shared by the head presence mark (drawn
-// whenever a body is tracked) and the teach hand-over-face target, so the
-// face reads as the same printed object everywhere. Both paths trace around
-// (0,0); the caller translates, fills and strokes.
+// face inked on it. Drawn as part of the head presence mark, which doubles
+// as the teach hand-over-face target (it glows when a hand is in range), so
+// there is exactly ONE face on screen; a separate, bigger target overlay
+// used to float over this one during recording and read as clutter. Both
+// paths trace around (0,0); the caller translates, fills and strokes.
 function traceFaceEgg(ctx, u, v) {
   ctx.beginPath();
   ctx.moveTo(0, -v);
@@ -387,46 +387,32 @@ function traceFaceEgg(ctx, u, v) {
   ctx.bezierCurveTo(-u, -v * 0.1, -u * 0.95, -v, 0, -v);
   ctx.closePath();
 }
+// The features, four strokes: a browline waving over both brows, dipping at
+// the glabella and ending in a curl; an S-curve nose from the glabella,
+// curling into the nostril; a resting eyelid under the left brow; and
+// closed, sculpted lips (cupid's bow, one outline, a mouth line).
 function traceFaceLines(ctx, u, v) {
   ctx.beginPath();
-  ctx.moveTo(-0.5 * u, -0.28 * v);
-  ctx.bezierCurveTo(-0.3 * u, -0.44 * v, -0.1 * u, -0.4 * v, 0.02 * u, -0.33 * v);
-  ctx.bezierCurveTo(0.18 * u, -0.44 * v, 0.38 * u, -0.42 * v, 0.5 * u, -0.3 * v);
-  ctx.moveTo(0.02 * u, -0.3 * v);
-  ctx.bezierCurveTo(0.08 * u, -0.1 * v, 0.14 * u, 0.05 * v, 0.05 * u, 0.14 * v);
-  ctx.bezierCurveTo(-0.04 * u, 0.2 * v, -0.1 * u, 0.12 * v, -0.05 * u, 0.07 * v);
-  ctx.moveTo(-0.26 * u, 0.48 * v);
-  ctx.bezierCurveTo(-0.1 * u, 0.4 * v, -0.04 * u, 0.44 * v, 0, 0.44 * v);
-  ctx.bezierCurveTo(0.04 * u, 0.44 * v, 0.1 * u, 0.4 * v, 0.26 * u, 0.48 * v);
-  ctx.moveTo(-0.2 * u, 0.56 * v);
-  ctx.bezierCurveTo(-0.07 * u, 0.66 * v, 0.07 * u, 0.66 * v, 0.2 * u, 0.56 * v);
-}
-
-// Visual guide: the face target that lights up when a wrist is close enough
-// to count as "hand over face". The one-line face instead of an anonymous
-// circle: the shape itself says "this is a face, cover it". The detection
-// geometry is unchanged; this is only how the threshold is shown.
-function drawRestTargets() {
-  if (!restInfo) return;
-  const { anchor, scale, on } = restInfo;
-  const r = REST_ENTER * scale * overlay.width * 0.9;
-  const u = r * 0.8;   // face half-width
-  const v = r * 1.05;  // face half-height
-  octx.save();
-  octx.translate(anchor.x * overlay.width, anchor.y * overlay.height);
-  octx.lineJoin = "round";
-  octx.lineCap = "round";
-  traceFaceEgg(octx, u, v);
-  octx.fillStyle = on ? "rgba(236,255,0,0.35)" : "rgba(255,255,255,0.5)";
-  octx.fill();
-  octx.strokeStyle = on ? "rgba(236,255,0,0.95)" : "rgba(255,255,255,0.75)";
-  octx.lineWidth = on ? 4 : 2.5;
-  octx.stroke();
-  octx.strokeStyle = "rgba(24,20,16,0.8)";
-  octx.lineWidth = Math.max(2, r * 0.045);
-  traceFaceLines(octx, u, v);
-  octx.stroke();
-  octx.restore();
+  ctx.moveTo(-0.52 * u, -0.30 * v);
+  ctx.bezierCurveTo(-0.42 * u, -0.44 * v, -0.22 * u, -0.46 * v, -0.08 * u, -0.36 * v);
+  ctx.bezierCurveTo(0.02 * u, -0.30 * v, 0.06 * u, -0.34 * v, 0.14 * u, -0.42 * v);
+  ctx.bezierCurveTo(0.26 * u, -0.52 * v, 0.44 * u, -0.44 * v, 0.50 * u, -0.32 * v);
+  ctx.bezierCurveTo(0.52 * u, -0.27 * v, 0.46 * u, -0.24 * v, 0.42 * u, -0.28 * v);
+  ctx.moveTo(-0.04 * u, -0.30 * v);
+  ctx.bezierCurveTo(0, -0.14 * v, 0.05 * u, -0.02 * v, 0.08 * u, 0.08 * v);
+  ctx.bezierCurveTo(0.11 * u, 0.16 * v, 0.04 * u, 0.21 * v, -0.03 * u, 0.17 * v);
+  ctx.bezierCurveTo(-0.08 * u, 0.13 * v, -0.05 * u, 0.09 * v, -0.01 * u, 0.11 * v);
+  ctx.moveTo(-0.34 * u, -0.145 * v);
+  ctx.bezierCurveTo(-0.26 * u, -0.185 * v, -0.15 * u, -0.185 * v, -0.08 * u, -0.15 * v);
+  ctx.moveTo(-0.28 * u, 0.46 * v);
+  ctx.bezierCurveTo(-0.16 * u, 0.39 * v, -0.08 * u, 0.39 * v, -0.03 * u, 0.43 * v);
+  ctx.bezierCurveTo(-0.01 * u, 0.41 * v, 0.01 * u, 0.41 * v, 0.03 * u, 0.43 * v);
+  ctx.bezierCurveTo(0.08 * u, 0.39 * v, 0.16 * u, 0.39 * v, 0.28 * u, 0.46 * v);
+  ctx.bezierCurveTo(0.20 * u, 0.57 * v, 0.08 * u, 0.62 * v, 0, 0.62 * v);
+  ctx.bezierCurveTo(-0.08 * u, 0.62 * v, -0.20 * u, 0.57 * v, -0.28 * u, 0.46 * v);
+  ctx.closePath();
+  ctx.moveTo(-0.21 * u, 0.475 * v);
+  ctx.bezierCurveTo(-0.08 * u, 0.51 * v, 0.08 * u, 0.51 * v, 0.21 * u, 0.475 * v);
 }
 
 // Big R / L letters on the wrists during a teach: RIGHT hand starts the
@@ -437,9 +423,9 @@ function drawHandLabel(w, letter, active) {
   if (!w || (w.visibility ?? 0) < 0.3) return;
   let x = w.x * overlay.width;
   let y = w.y * overlay.height - 12;
-  // Keep the letter clear of the face target circle: when the wrist is at or
-  // near the face, push the label just outside the circle, away from its
-  // centre, so it never covers the target the hand is aiming for.
+  // Keep the letter clear of the face: when the wrist is at or near it,
+  // push the label outside the face area, away from its centre, so it never
+  // covers the head mark the hand is aiming for.
   if (restInfo) {
     const ax = restInfo.anchor.x * overlay.width;
     const ay = restInfo.anchor.y * overlay.height;
@@ -1077,6 +1063,16 @@ function drawPresence(lms, now) {
         octx.lineWidth = Math.max(1.6, r * 0.08);
         traceFaceLines(octx, u, v);
         octx.stroke();
+        // The head mark IS the hand-over-face target: on the Teach tab it
+        // glows when a hand is close enough to count as covering.
+        if (restInfo?.on && currentTab === "teach") {
+          traceFaceEgg(octx, u, v);
+          octx.fillStyle = "rgba(236,255,0,0.3)";
+          octx.fill();
+          octx.strokeStyle = "rgba(236,255,0,0.95)";
+          octx.lineWidth = 4;
+          octx.stroke();
+        }
         octx.restore();
         continue;
       }
@@ -1437,10 +1433,10 @@ async function runFrame() {
             setPerformState();
           }
         }
-        // Face target circle + R/L hand labels belong to Teach only. The
+        // R/L hand labels belong to Teach only. The
         // R/L letters also show on the idle Teach tab (small, quiet) so you
         // see which hand starts and which stops BEFORE clicking Record.
-        if (teach && !teach.manual && !playback) { drawRestTargets(); drawHandLabels(lms); }
+        if (teach && !teach.manual && !playback) { drawHandLabels(lms); }
         else if (!teach && currentTab === "teach" && !playback) {
           drawHandLabels(lms);
           // Say it before they hit Record, not after the take is wasted.
