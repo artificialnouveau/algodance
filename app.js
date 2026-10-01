@@ -3937,10 +3937,8 @@ function activateTab(tab, focus = false) {
     if (templates.some((t) => (t.family || "blaze") === currentFamily)) warmupOffer.hidden = false;
   }
   if (name !== "perform") warmupOffer.hidden = true;
-  // The opening tab belongs to the attract ghost (the mimetic first lesson);
-  // any other tab hands the stage back to the visitor.
-  if (name === "howto") { if (ready && !tut) startAttract(); }
-  else stopAttract();
+  // Leaving the opening tab hands the stage back; the ghost never follows.
+  if (name !== "howto") stopAttract();
   if (ready) setPerformState();
   if (focus) tab.focus();
 }
@@ -4377,6 +4375,7 @@ function startAttract() {
   startPlaybackItems(playbackReps(items), "AlgoDance", "attract");
   if (!playback) return;
   pbLoop = true;
+  pbSpeed = 0.75; // easy to follow; DTW scoring does not care about tempo
   playback.allItems = items;
   playback.capture = [];
   attractArmed = true;
@@ -4384,6 +4383,7 @@ function startAttract() {
   clearTimeout(attractNoteTimer);
   attractNote.hidden = false;
   attractNote.innerHTML = 'Dance along. This move says <b>ALGODANCE</b>.';
+  syncAttractBtn();
 }
 function stopAttract() {
   if (!attractArmed) return;
@@ -4391,7 +4391,21 @@ function stopAttract() {
   clearTimeout(attractNoteTimer);
   attractNote.hidden = true;
   if (playback?.key === "attract") stopPlayback();
+  syncAttractBtn();
 }
+// The ghost dances on REQUEST on the opening tab: auto-starting it read as a
+// tutorial nobody asked for, racing ahead of a visitor still orienting. Only
+// an idle kiosk, where there is nobody to click, starts it by itself.
+const attractBtn = document.getElementById("attractBtn");
+function syncAttractBtn() {
+  if (attractBtn) attractBtn.textContent = attractArmed
+    ? "Stop the ghost"
+    : "Dance along with the first move";
+}
+attractBtn?.addEventListener("click", () => {
+  if (attractArmed) stopAttract();
+  else startAttract();
+});
 // One ghost cycle ended: score whatever the visitor danced alongside it.
 function attractCycleEnd(now) {
   const pb = playback;
@@ -4524,7 +4538,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v76 (2026-10-01)");
+  console.log("AlgoDance build v77 (2026-10-01)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();
@@ -4555,8 +4569,6 @@ document.getElementById("introDismiss").addEventListener("click", () => {
     clearTimeout(slow);
     statusEl.textContent = "Ready.";
     setPerformState();
-    // The first thing a visitor meets is the seed ghost, not a paragraph.
-    if (currentTab === "howto" && !tut) startAttract();
   } catch (err) {
     clearTimeout(slow);
     console.error(err);

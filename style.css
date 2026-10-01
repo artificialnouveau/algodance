@@ -1046,6 +1046,7 @@ body.kiosk .kiosk-phrase .chip:nth-child(3n) { transform: rotate(1.2deg); }
 body.kiosk .topbar,
 body.kiosk .panel,
 body.kiosk .status-bar,
+body.kiosk .pb-controls,
 body.kiosk .header-toggle { display: none !important; }
 body.kiosk .layout { grid-template-columns: 1fr; padding: 0; gap: 0; }
 body.kiosk .video-wrap {

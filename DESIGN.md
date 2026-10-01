@@ -174,9 +174,11 @@ JSON file is supported for backup and manual sharing today.
 
 ### The mimetic first lesson / attract loop
 
-The first thing a visitor meets is the seed ghost, not a paragraph: on the
-opening tab (and on a kiosk idle for 45 s) the AlgoDance ghost loops with a
-taped caption ("Dance along. This move says ALGODANCE"). Each ghost cycle
+The seed ghost dances on request, never uninvited: "Dance along with the
+first move" on the opening tab starts it (auto-starting it raced ahead of a
+visitor still orienting), and only an idle kiosk (45 s), where there is
+nobody to click, starts it by itself. It loops at 0.75 speed with a taped
+caption ("Dance along. This move says ALGODANCE"). Each ghost cycle
 scores whatever the visitor danced alongside it (lenient threshold, the word is
 unambiguous), and a good copy fires the word: the first exchange with the
 piece is danced. On a kiosk, two cycles of a body dancing without matching
