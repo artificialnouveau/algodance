@@ -494,7 +494,9 @@ body.rot90 .video-wrap {
 #bpmInput { width: 70px; }
 
 /* ---- Mobile: the stream IS the screen ---- */
-.sheet-toggle { display: none; }
+/* Double class: .btn's own display (declared later) must not resurrect this
+   phone-only control on desktop, where there is no sheet to hide. */
+.btn.sheet-toggle { display: none; }
 @media (max-width: 900px) {
   body:not(.rot90) { overflow: hidden; }
   /* Compact floating header: logo + tab pills in one row over the video */
@@ -548,15 +550,15 @@ body.rot90 .video-wrap {
   body.sheet-collapsed .panel { transform: translateY(calc(100% + 2px)); }
   /* The sheet toggle lives at the thumb, riding the sheet's top edge: it is
      the control a one-handed visitor reaches for most. */
-  .sheet-toggle {
-    display: block;
+  .btn.sheet-toggle {
+    display: inline-flex;
     position: fixed;
     right: 10px;
     top: auto;
     bottom: calc(46dvh + 12px);
     z-index: 26;
   }
-  body.sheet-collapsed .sheet-toggle { bottom: 14px; }
+  body.sheet-collapsed .btn.sheet-toggle { bottom: 14px; }
   .pb-controls { top: 96px; bottom: auto; left: 10px; }
   /* Reading tabs (About / AlgoDance) keep a full-screen panel */
   .layout.pdf-full .panel, .layout.content-full .panel {
@@ -678,6 +680,11 @@ body.rot90 .video-wrap {
   /* Without min-height:0 a grid item refuses to shrink below its content, so
      overflow:auto below never engages and the column pushes the page taller. */
   min-height: 0;
+  /* Positioned, so the sheet paints above the fixed word wall even on the
+     reading tabs, where the paste-up transform (its stacking context) is
+     stripped and wall scraps used to bleed through the text. */
+  position: relative;
+  z-index: 1;
   background:
     repeating-linear-gradient(180deg, rgba(20,65,122,.07) 0 1px, rgba(0,0,0,0) 1px 26px),
     var(--paper-2);
