@@ -260,9 +260,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 300px;
   gap: 12px;
-  /* The bottom reserve is the word wall's strip of bare tile: the one place
-     the wall is guaranteed to stay visible on a board this full. */
-  padding: 12px 12px 58px;
+  padding: 12px;
   min-height: 0;
 }
 @media (max-width: 900px) {
@@ -1544,39 +1542,6 @@ body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
 }
 .attract-note b { font-family: var(--font-display); font-weight: 900; letter-spacing: .02em; }
 
-/* The word wall: everything the installation has ever spoken, taped along
-   the strip of bare tile reserved at the foot of the board (the layout's
-   bottom padding). Scattering scraps across the whole wall buried them
-   behind the collage, leaving glitch-like slivers at the torn edges; a
-   fringe of flyers along the floor line stays whole and legible. */
-.word-wall {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-.word-wall .wall-word {
-  position: absolute;
-  transform: rotate(var(--wr, 0deg));
-  background: var(--paper-2);
-  color: var(--ink);
-  border: 1px solid rgba(28,24,21,.6);
-  font-family: var(--font-display);
-  font-weight: 900;
-  line-height: 1.1;
-  padding: .08em .35em .14em;
-  box-shadow: var(--lift-1);
-  white-space: nowrap;
-}
-.word-wall .wall-word.y {
-  background: var(--yellow);
-  box-shadow: 2px 3px 0 var(--accent), 3px 6px 12px rgba(20,34,44,.26);
-}
-@media (max-width: 900px) { .word-wall { display: none; } }
-body.kiosk .word-wall,
-body.header-collapsed .word-wall { display: none; }
-
 /* The registration mark is the latch for the back of the sheet: it has to
    accept the press its container refuses. */
 .mm-marks .reg { pointer-events: auto; cursor: pointer; }
@@ -1709,15 +1674,54 @@ body.header-collapsed .word-wall { display: none; }
 .dict-tools input[type="text"] { flex: 1; min-width: 0; }
 .dict-tools select { width: auto; flex-shrink: 0; }
 
-/* Letter dividers, the way a dictionary runs: a stamped initial on a rule. */
-.dict-letter {
-  list-style: none;
-  margin: 16px 0 8px;
-  padding-bottom: 2px;
+/* Letter sections, the way a dictionary runs: a stamped initial on a rule,
+   collapsed to an index until clicked open. */
+.dict-letter { list-style: none; margin: 8px 0 0; }
+.dict-letter button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
   border-bottom: 1.5px solid var(--ink);
+  padding: 6px 2px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-hand);
+}
+.dict-letter b {
   font-family: var(--font-display);
   font-size: 20px;
   font-weight: 900;
+  line-height: 1;
   color: var(--accent-2);
 }
-.code-list .dict-letter:first-child { margin-top: 4px; }
+/* A drawn disclosure triangle, pointing along until the section opens. */
+.dict-letter .caret {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid var(--ink);
+  transform: rotate(-90deg);
+  transition: transform var(--dur-1) var(--ease);
+}
+.dict-letter.open .caret { transform: none; }
+.dict-letter span {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.dict-letter.open { margin-bottom: 8px; }
+.code-list .dict-letter:first-child { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .dict-letter .caret { transition: none; } }
+
+/* The teach countdowns are centered (the big 3-2-1), so their caption sits
+   just below screen center instead of under the top numeral. */
+.count-label.mid {
+  top: 50%;
+  transform: translate(-50%, clamp(34px, 8vw, 80px));
+  padding-top: 0;
+}

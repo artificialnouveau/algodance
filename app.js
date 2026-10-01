@@ -103,6 +103,9 @@ const teachMsg = document.getElementById("teachMsg");
 const codeList = document.getElementById("codeList");
 const codeSearchEl = document.getElementById("codeSearch");
 const codeSortEl = document.getElementById("codeSort");
+// Which A-to-Z sections are open. Starts empty every visit, so the
+// dictionary greets you as a compact index rather than a scroll.
+const dictOpen = new Set();
 codeSearchEl?.addEventListener("input", () => renderCodeList());
 codeSortEl?.addEventListener("change", () => renderCodeList());
 const exportBtn = document.getElementById("exportBtn");
@@ -2344,7 +2347,6 @@ function fireWord(word, now) {
   lastFireAt = now;
   lastFiredWord = word;
   lastActivityAt = now;
-  addToWall(word); // the wall keeps everything the installation has said
   // Reveal word, ping and riso flash together, timed to when the speech
   // engine actually starts talking, so eye and ear get the word at once.
   const reveal = () => {
@@ -2466,8 +2468,13 @@ function updateCaptureOverlay(now) {
     bigWord.classList.remove("show");
     bigStatus.textContent = secs;
     bigStatus.className = "big-status show " + (kind === "stop" ? "stop" : "count");
+    // Name the countdown: a bare 3-2-1 does not say what happens at zero.
+    countLabel.hidden = false;
+    countLabel.textContent = kind === "stop" ? "saving in" : "recording in";
+    countLabel.className = "count-label mid" + (kind === "stop" ? " lead" : "");
   } else if (bigStatus.classList.contains("rec") || bigStatus.classList.contains("count") || bigStatus.classList.contains("stop")) {
     bigStatus.className = "big-status"; // leave SAVED flashes alone
+    if (!playback && !teach) countLabel.hidden = true;
   }
 
   // Riso treatment: on while actually recording a pose, plus a short window
@@ -2488,7 +2495,7 @@ function updateCaptureOverlay(now) {
       danceCount.textContent = String(count);
       countLabel.hidden = false;
       countLabel.textContent = "dance";
-      countLabel.classList.remove("lead");
+      countLabel.className = "count-label";
       danceCount.classList.remove("lead", "tick");
       void danceCount.offsetWidth;
       danceCount.classList.add("tick");
@@ -2680,6 +2687,7 @@ function finishTeach(now, timedOut = false) {
   const t = teach;
   teach = null;
   countdownEl.hidden = true;
+  countLabel.hidden = true;
   recordBtn.disabled = false;
   recordBtn.textContent = "Record movement";
   setPerformState();
@@ -2776,6 +2784,7 @@ function cancelTeach() {
   teach = null;
   clearTimeout(ghostPreviewTimer);
   countdownEl.hidden = true;
+  countLabel.hidden = true;
   bigStatus.className = "big-status"; // clear any REC overlay
   recordBtn.disabled = false;
   recordBtn.textContent = "Record movement";
@@ -3502,17 +3511,26 @@ function renderCodeList() {
     codeList.innerHTML = `<li class="empty">No words match “${escapeHtml(q)}”.</li>`;
     return;
   }
+  // A-to-Z sections are collapsed letter headers that open on click; a
+  // search shows its matches flat, because filtering already did the finding.
+  const letterOf = (g) => (g.word[0] || "#").toUpperCase();
   let lastLetter = null;
+  let letterOpen = true;
   for (const g of entries) {
-    if (sortMode === "az") {
-      const letter = (g.word[0] || "#").toUpperCase();
+    if (sortMode === "az" && !q) {
+      const letter = letterOf(g);
       if (letter !== lastLetter) {
         lastLetter = letter;
+        letterOpen = dictOpen.has(letter);
+        const n = entries.filter((x) => letterOf(x) === letter).length;
         const div = document.createElement("li");
-        div.className = "dict-letter";
-        div.textContent = letter;
+        div.className = "dict-letter" + (letterOpen ? " open" : "");
+        div.innerHTML = `<button type="button" data-letter="${letter}" aria-expanded="${letterOpen}">`
+          + `<b>${escapeHtml(letter)}</b><i class="caret" aria-hidden="true"></i>`
+          + `<span>${n} word${n > 1 ? "s" : ""}</span></button>`;
         codeList.appendChild(div);
       }
+      if (!letterOpen) continue;
     }
     const count = g.items.length;
     const last = Math.max(...g.items.map((t) => t.createdAt));
@@ -3610,6 +3628,13 @@ performListEl.addEventListener("click", (e) => {
 });
 
 codeList.addEventListener("click", async (e) => {
+  const letterBtn = e.target.closest("[data-letter]");
+  if (letterBtn) {
+    const L = letterBtn.dataset.letter;
+    if (dictOpen.has(L)) dictOpen.delete(L); else dictOpen.add(L);
+    renderCodeList();
+    return;
+  }
   const btn = e.target.closest("[data-act]");
   if (!btn) return;
   const act = btn.dataset.act;
@@ -4340,63 +4365,10 @@ function bindLongPress(el, ms, fn) {
 bindLongPress(document.querySelector(".mm-marks .reg"), 1600, openBackBoard);
 bindLongPress(document.querySelector(".logo"), 1600, openBackBoard);
 
-// ---------- The word wall ----------
-// Every word the installation has ever spoken is taped to the tile wall and
-// stays there: the accumulating artwork. One scrap per distinct word; saying
-// it again makes the scrap grow, so the wall records what gets said most.
-// Placement is chosen once and persisted, so the wall is stable across days.
-const WALL_KEY = "algodance.wall.v1";
-const wallEl = document.getElementById("wordWall");
-let wall = [];
-try { wall = JSON.parse(localStorage.getItem(WALL_KEY)) || []; } catch { wall = []; }
-function saveWall() {
-  try { localStorage.setItem(WALL_KEY, JSON.stringify(wall)); } catch {}
-}
-function wallFontSize(count) {
-  return Math.min(30, 16 + Math.round(Math.log2(count + 1) * 5));
-}
-function renderWall() {
-  if (!wallEl) return;
-  wallEl.innerHTML = "";
-  for (const e of wall) {
-    const s = document.createElement("span");
-    s.className = "wall-word" + (e.yel ? " y" : "");
-    s.textContent = e.word;
-    s.style.left = e.x + "%";
-    // Along the reserved tile strip at the foot of the board. The stored y
-    // (once a free position on the whole wall) just staggers the baseline.
-    s.style.bottom = (4 + (Math.round(e.y) % 18)) + "px";
-    s.style.fontSize = wallFontSize(e.count) + "px";
-    s.style.setProperty("--wr", e.rot + "deg");
-    wallEl.appendChild(s);
-  }
-}
-function addToWall(word) {
-  const k = word.toLowerCase();
-  const e = wall.find((w) => w.word.toLowerCase() === k);
-  if (e) {
-    e.count++;
-  } else {
-    wall.push({
-      word,
-      count: 1,
-      x: +(1 + Math.random() * 86).toFixed(1),
-      y: +(Math.random() * 90).toFixed(1), // staggers the strip baseline
-      rot: +(Math.random() * 7 - 3.5).toFixed(1),
-      yel: Math.random() < 0.3 ? 1 : 0,
-      at: Date.now(),
-    });
-    if (wall.length > 240) wall.shift();
-  }
-  saveWall();
-  renderWall();
-}
-document.getElementById("wallClear")?.addEventListener("click", async () => {
-  if (!(await paperConfirm("Clear the word wall? The moves themselves stay.", "Clear"))) return;
-  wall = [];
-  saveWall();
-  renderWall();
-});
+// The word wall (words taped to the tiles behind the page) was tried and
+// removed: on a board this full it read as clutter, not collage. Any data it
+// left behind is cleaned up here.
+try { localStorage.removeItem("algodance.wall.v1"); } catch {}
 
 // ---------- Attract: the ghost runs the room ----------
 // The first lesson is mimetic. On the opening tab, and on an idle kiosk, the
@@ -4583,7 +4555,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v80 (2026-10-01)");
+  console.log("AlgoDance build v81 (2026-10-01)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();
@@ -4592,7 +4564,6 @@ document.getElementById("introDismiss").addEventListener("click", () => {
   syncManualHint();
   renderCodeList();
   renderPhrase();
-  renderWall();
   if (!localStorage.getItem(INTRO_KEY)) introHint.hidden = false;
 
   // The pose engine is a ~15 MB first-time download (wasm + model). Kick it off

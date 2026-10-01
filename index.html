@@ -6,14 +6,9 @@
   <title>AlgoDance: Code a movement</title>
   <link rel="preload" href="fonts/bodoni-moda-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/courier-prime-latin-400.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="style.css?v=80" />
+  <link rel="stylesheet" href="style.css?v=81" />
 </head>
 <body>
-  <!-- The word wall: every word the installation has ever spoken, taped to the
-       tiles behind the paper surfaces. First in the body so it paints under
-       everything else. Decorative to AT; the Sentence panel carries the text. -->
-  <div id="wordWall" class="word-wall" aria-hidden="true"></div>
-
   <!-- Collage furniture: printer's crop marks and a registration target, the
        marks a paste-up leaves behind. Decorative, never announced to AT.
        The registration target doubles as the latch for the back of the sheet:
@@ -249,7 +244,7 @@
             <input id="bpmInput" type="number" min="60" max="160" step="1" value="80" /> BPM
             <small class="muted">A metronome counts 1, 2, 3, 4 at this tempo while you record. Moves taught on the counts play back and chain more naturally.</small>
           </label>
-          <small class="muted">The hand-on-face moments are trimmed automatically, so only your move is saved. To reuse an existing word without typing, hold a hand over its floating scrap on the video for a moment.</small>
+          <small class="muted">The hand-on-face moments are trimmed automatically, so only your move is saved. No keyboard needed for saved words: on this tab they hang as small labels along the edge of the video. Reach a hand out to a label and hold it there for a second, and that word is picked for the next take.</small>
         </details>
       </div>
 
@@ -352,7 +347,6 @@
       <h3>The dictionary</h3>
       <div class="row-actions">
         <button id="clearAll" class="btn ghost small danger">Delete all moves</button>
-        <button id="wallClear" class="btn ghost small danger">Clear the word wall</button>
       </div>
       <small class="muted">Delete all downloads a backup file first, so Import can undo it.</small>
 
@@ -374,6 +368,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=80"></script>
+  <script type="module" src="app.js?v=81"></script>
 </body>
 </html>

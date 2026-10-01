@@ -163,7 +163,9 @@ JSON file is supported for backup and manual sharing today.
 - Six tabs: **How it works** (default), **Teach**, **Perform**, **Codes**,
   **About**, **Zine**.
 - The Codes tab reads like the dictionary it is: find-as-you-type search,
-  A-to-Z with stamped letter dividers (or newest first), one entry per word.
+  A-to-Z letter sections collapsed to an index until clicked open (newest
+  first as the flat alternative), one entry per word. A search shows its
+  matches flat.
 - Playback counts are captioned ("get ready" under the yellow 5-6-7-8
   count-in, "dance" under the white move counts), because the dancer's
   count-in convention is not a walk-up visitor's. The attract caption tapes
@@ -209,17 +211,14 @@ hidden), or Shift+O. Switching algorithm family asks an in-world confirm that
 names the consequence (the other family's moves stop matching). The browser's
 `confirm()`/`prompt()` are never used; a paper-dialog scrap asks instead.
 
-### The word wall
+### The word wall (tried, removed)
 
-Every word the installation has ever spoken is taped along a reserved strip
-of bare tile at the foot of the board (the layout's bottom padding). Scraps
-were first scattered across the whole wall, but the desktop collage covers
-nearly all of it, so only glitch-like slivers peeked from behind the torn
-edges; the fringe of flyers along the floor line stays whole and legible.
-One scrap per distinct word, placed once and persisted
-(`algodance.wall.v1`); saying a word again grows its scrap (log-scaled,
-capped at 30px), so the wall records what the room says most. Hidden on
-phones and in kiosk, where the video owns the screen.
+Words taped to the tiles behind the page were tried twice (scattered across
+the wall, then as a strip along its foot) and removed: on a board this full
+they read as clutter, not collage, and the reserved strip squeezed the
+status line off short screens. Anti-reference: do not reintroduce ambient
+word scraps on the board. The spoken record lives in the Sentence panel and
+the kiosk phrase strip.
 
 ### Hands-only word picking
 
@@ -337,7 +336,6 @@ full-screen performance view, and per-code thresholds.
 - [x] Mixed-media visual world; optional background cutout
 - [x] Operator "back of the sheet" (hidden settings surface; model-switch guard)
 - [x] Mimetic first lesson + kiosk attract loop (copy the seed ghost)
-- [x] Persistent word wall (everything the installation has said)
 - [x] Visible rejection feedback (miss scraps, also in kiosk)
 - [x] Hands-only word picking (dwell over a word scrap)
 - [x] Stamped instruction strips; in-world dialogs replace confirm()/prompt()
