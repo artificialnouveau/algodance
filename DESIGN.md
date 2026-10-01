@@ -162,6 +162,12 @@ JSON file is supported for backup and manual sharing today.
 
 - Six tabs: **How it works** (default), **Teach**, **Perform**, **Codes**,
   **About**, **Zine**.
+- The Codes tab reads like the dictionary it is: find-as-you-type search,
+  A-to-Z with stamped letter dividers (or newest first), one entry per word.
+- Playback counts are captioned ("get ready" under the yellow 5-6-7-8
+  count-in, "dance" under the white move counts), because the dancer's
+  count-in convention is not a walk-up visitor's. The attract caption tapes
+  to the photo's top-right corner, clear of the dancer and the counts.
 - Big webcam stage with skeleton overlay (mirrored, selfie-style); matched word
   animates large over the video; a phrase strip collects matched words.
 - Perform shows only its core (your codes, the match meter, the phrase);
@@ -205,11 +211,14 @@ names the consequence (the other family's moves stop matching). The browser's
 
 ### The word wall
 
-Every word the installation has ever spoken is taped to the tile wall, UNDER
-the paper surfaces (z-index 0), so language peeks out of the gutters and the
-wall slowly disappears beneath it. One scrap per distinct word, placed once
-and persisted (`algodance.wall.v1`); saying a word again grows its scrap
-(log-scaled, capped), so the wall records what the room says most. Hidden on
+Every word the installation has ever spoken is taped along a reserved strip
+of bare tile at the foot of the board (the layout's bottom padding). Scraps
+were first scattered across the whole wall, but the desktop collage covers
+nearly all of it, so only glitch-like slivers peeked from behind the torn
+edges; the fringe of flyers along the floor line stays whole and legible.
+One scrap per distinct word, placed once and persisted
+(`algodance.wall.v1`); saying a word again grows its scrap (log-scaled,
+capped at 30px), so the wall records what the room says most. Hidden on
 phones and in kiosk, where the video owns the screen.
 
 ### Hands-only word picking

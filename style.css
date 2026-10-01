@@ -260,7 +260,9 @@ body {
   display: grid;
   grid-template-columns: 1fr 300px;
   gap: 12px;
-  padding: 12px;
+  /* The bottom reserve is the word wall's strip of bare tile: the one place
+     the wall is guaranteed to stay visible on a board this full. */
+  padding: 12px 12px 58px;
   min-height: 0;
 }
 @media (max-width: 900px) {
@@ -1520,15 +1522,15 @@ body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
 }
 .range-ends i { font-style: normal; }
 
-/* Attract caption: taped under the looping seed ghost, the installation's
-   standing invitation. */
+/* Attract caption: taped to the photo's top-right corner, clear of the
+   dancer, the count numeral and the count dots. */
 .attract-note {
   position: absolute;
-  left: 50%;
-  bottom: 7%;
-  transform: translateX(-50%) rotate(-1.2deg);
+  right: 14px;
+  top: 12px;
+  transform: rotate(1.2deg);
   z-index: 4;
-  max-width: 86%;
+  max-width: min(46%, 420px);
   text-align: center;
   background: var(--yellow);
   color: var(--ink);
@@ -1542,9 +1544,11 @@ body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
 }
 .attract-note b { font-family: var(--font-display); font-weight: 900; letter-spacing: .02em; }
 
-/* The word wall: everything the installation has ever spoken, taped to the
-   tiles UNDER the paper surfaces (first in the DOM, z-index 0), so words peek
-   out of the gutters and the wall slowly disappears under language. */
+/* The word wall: everything the installation has ever spoken, taped along
+   the strip of bare tile reserved at the foot of the board (the layout's
+   bottom padding). Scattering scraps across the whole wall buried them
+   behind the collage, leaving glitch-like slivers at the torn edges; a
+   fringe of flyers along the floor line stays whole and legible. */
 .word-wall {
   position: fixed;
   inset: 0;
@@ -1676,3 +1680,44 @@ body.header-collapsed .word-wall { display: none; }
   .word-wall .wall-word { transform: none; }
   .attract-note { transform: translateX(-50%); }
 }
+
+/* Stacked full-width actions breathe apart instead of touching edges. */
+.btn.block + .btn.block { margin-top: 10px; }
+
+/* Caption under the count numeral, naming what it means: the yellow
+   "5 6 7 8" is the get-ready count-in, the white counts are the move. */
+.count-label {
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding-top: clamp(50px, 9.2vw, 108px);
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: clamp(13px, 1.8vw, 20px);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #FFFDF4;
+  text-shadow: 2px 2px 0 rgba(28,24,21,.85), 0 4px 18px rgba(0,0,0,.5);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.count-label.lead { color: #ECFF00; }
+
+/* Dictionary tools: find-as-you-type and sort, one row above the entries. */
+.dict-tools { display: flex; gap: 8px; margin: 2px 0 10px; }
+.dict-tools input[type="text"] { flex: 1; min-width: 0; }
+.dict-tools select { width: auto; flex-shrink: 0; }
+
+/* Letter dividers, the way a dictionary runs: a stamped initial on a rule. */
+.dict-letter {
+  list-style: none;
+  margin: 16px 0 8px;
+  padding-bottom: 2px;
+  border-bottom: 1.5px solid var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--accent-2);
+}
+.code-list .dict-letter:first-child { margin-top: 4px; }

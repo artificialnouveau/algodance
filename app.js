@@ -54,6 +54,7 @@ const countdownEl = document.getElementById("countdown");
 const bigStatus = document.getElementById("bigStatus");
 const modelSel = document.getElementById("modelSel");
 const danceCount = document.getElementById("danceCount");
+const countLabel = document.getElementById("countLabel");
 const countDots = document.getElementById("countDots");
 const pbControls = document.getElementById("pbControls");
 const bpmInput = document.getElementById("bpmInput");
@@ -100,6 +101,10 @@ const recordBtn = document.getElementById("recordBtn");
 const teachMsg = document.getElementById("teachMsg");
 
 const codeList = document.getElementById("codeList");
+const codeSearchEl = document.getElementById("codeSearch");
+const codeSortEl = document.getElementById("codeSort");
+codeSearchEl?.addEventListener("input", () => renderCodeList());
+codeSortEl?.addEventListener("change", () => renderCodeList());
 const exportBtn = document.getElementById("exportBtn");
 const importBtn = document.getElementById("importBtn");
 const importFile = document.getElementById("importFile");
@@ -2481,6 +2486,9 @@ function updateCaptureOverlay(now) {
       teach.lastBeat = count;
       danceCount.hidden = false;
       danceCount.textContent = String(count);
+      countLabel.hidden = false;
+      countLabel.textContent = "dance";
+      countLabel.classList.remove("lead");
       danceCount.classList.remove("lead", "tick");
       void danceCount.offsetWidth;
       danceCount.classList.add("tick");
@@ -2496,7 +2504,7 @@ function updateCaptureOverlay(now) {
   } else if (teachCountsOn) {
     teachCountsOn = false;
     countDots.classList.remove("four");
-    if (!playback) { danceCount.hidden = true; countDots.hidden = true; }
+    if (!playback) { danceCount.hidden = true; countLabel.hidden = true; countDots.hidden = true; }
   }
 
   if (!ready || !teach) return; // Perform manages its own status line
@@ -2981,6 +2989,7 @@ function stopPlayback() {
   }
   playback = null;
   danceCount.hidden = true;
+  countLabel.hidden = true;
   countDots.hidden = true;
   pbControls.hidden = true;
   if (ready) setPerformState();
@@ -3406,6 +3415,7 @@ function drawPlayback(now) {
   // Counts: numeral + dot strip, updated only when the count changes.
   if (count == null) {
     danceCount.hidden = true;
+    countLabel.hidden = true;
     countDots.hidden = true;
   } else if (pb.lastCount !== count || pb.lastLead !== leading) {
     pb.lastCount = count;
@@ -3413,6 +3423,10 @@ function drawPlayback(now) {
     danceCount.hidden = false;
     danceCount.textContent = String(count);
     danceCount.classList.toggle("lead", leading);
+    // Say which count this is: the yellow numbers are only a count-in.
+    countLabel.hidden = false;
+    countLabel.textContent = leading ? "get ready" : "dance";
+    countLabel.classList.toggle("lead", leading);
     danceCount.classList.remove("tick");
     void danceCount.offsetWidth; // restart the pop animation
     danceCount.classList.add("tick");
@@ -3468,11 +3482,38 @@ function renderCodeList() {
   }
 
   if (groups.size === 0) {
-    codeList.innerHTML = '<li class="empty">No codes saved yet. Go to Teach to make one.</li>';
+    codeList.innerHTML = '<li class="empty">No moves saved yet. Go to Teach to make one.</li>';
     return;
   }
+  // A dictionary reads like one: filtered by the search field, A to Z with
+  // letter dividers by default, or newest first.
+  const q = (codeSearchEl?.value || "").trim().toLowerCase();
+  let entries = [...groups.values()];
+  if (q) entries = entries.filter((g) => g.word.toLowerCase().includes(q));
+  const sortMode = codeSortEl?.value || "az";
+  if (sortMode === "new") {
+    entries.sort((a, b) =>
+      Math.max(...b.items.map((t) => t.createdAt)) - Math.max(...a.items.map((t) => t.createdAt)));
+  } else {
+    entries.sort((a, b) => a.word.localeCompare(b.word, undefined, { sensitivity: "base" }));
+  }
   codeList.innerHTML = "";
-  for (const g of groups.values()) {
+  if (entries.length === 0) {
+    codeList.innerHTML = `<li class="empty">No words match “${escapeHtml(q)}”.</li>`;
+    return;
+  }
+  let lastLetter = null;
+  for (const g of entries) {
+    if (sortMode === "az") {
+      const letter = (g.word[0] || "#").toUpperCase();
+      if (letter !== lastLetter) {
+        lastLetter = letter;
+        const div = document.createElement("li");
+        div.className = "dict-letter";
+        div.textContent = letter;
+        codeList.appendChild(div);
+      }
+    }
     const count = g.items.length;
     const last = Math.max(...g.items.map((t) => t.createdAt));
     const fams = [...new Set(g.items.map((t) => t.family || "blaze"))];
@@ -4312,7 +4353,7 @@ function saveWall() {
   try { localStorage.setItem(WALL_KEY, JSON.stringify(wall)); } catch {}
 }
 function wallFontSize(count) {
-  return Math.min(60, 19 + Math.round(Math.log2(count + 1) * 9));
+  return Math.min(30, 16 + Math.round(Math.log2(count + 1) * 5));
 }
 function renderWall() {
   if (!wallEl) return;
@@ -4322,7 +4363,9 @@ function renderWall() {
     s.className = "wall-word" + (e.yel ? " y" : "");
     s.textContent = e.word;
     s.style.left = e.x + "%";
-    s.style.top = e.y + "%";
+    // Along the reserved tile strip at the foot of the board. The stored y
+    // (once a free position on the whole wall) just staggers the baseline.
+    s.style.bottom = (4 + (Math.round(e.y) % 18)) + "px";
     s.style.fontSize = wallFontSize(e.count) + "px";
     s.style.setProperty("--wr", e.rot + "deg");
     wallEl.appendChild(s);
@@ -4337,9 +4380,9 @@ function addToWall(word) {
     wall.push({
       word,
       count: 1,
-      x: +(2 + Math.random() * 88).toFixed(1),
-      y: +(2 + Math.random() * 90).toFixed(1),
-      rot: +(Math.random() * 9 - 4.5).toFixed(1),
+      x: +(1 + Math.random() * 86).toFixed(1),
+      y: +(Math.random() * 90).toFixed(1), // staggers the strip baseline
+      rot: +(Math.random() * 7 - 3.5).toFixed(1),
       yel: Math.random() < 0.3 ? 1 : 0,
       at: Date.now(),
     });
@@ -4540,7 +4583,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v79 (2026-10-01)");
+  console.log("AlgoDance build v80 (2026-10-01)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();

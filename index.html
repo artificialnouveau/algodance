@@ -6,7 +6,7 @@
   <title>AlgoDance: Code a movement</title>
   <link rel="preload" href="fonts/bodoni-moda-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/courier-prime-latin-400.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="style.css?v=79" />
+  <link rel="stylesheet" href="style.css?v=80" />
 </head>
 <body>
   <!-- The word wall: every word the installation has ever spoken, taped to the
@@ -93,6 +93,9 @@
         <canvas id="overlay"></canvas>
         <!-- Dance-tutorial playback: the count numeral and the 8-count strip -->
         <div id="danceCount" class="dance-count" hidden aria-hidden="true"></div>
+        <!-- Names what the numerals mean: "get ready" under the yellow
+             count-in, "dance" under the white move counts. -->
+        <div id="countLabel" class="count-label" hidden aria-hidden="true"></div>
         <div id="countDots" class="count-dots" hidden aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <!-- Playback practice controls: tempo, loop, step-through -->
         <div id="pbControls" class="pb-controls" hidden>
@@ -253,6 +256,13 @@
       <!-- CODES -->
       <div class="tabpane" data-pane="codes" id="pane-codes" role="tabpanel" aria-labelledby="tab-codes" hidden>
         <h2>The dictionary</h2>
+        <div class="dict-tools">
+          <input id="codeSearch" type="text" placeholder="Find a word…" aria-label="Find a word" />
+          <select id="codeSort" aria-label="Sort the dictionary">
+            <option value="az">A to Z</option>
+            <option value="new">Newest first</option>
+          </select>
+        </div>
         <div class="codes-actions">
           <button id="exportBtn" class="btn ghost small">Export</button>
           <button id="importBtn" class="btn ghost small">Import</button>
@@ -364,6 +374,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=79"></script>
+  <script type="module" src="app.js?v=80"></script>
 </body>
 </html>
