@@ -220,12 +220,13 @@ status line off short screens. Anti-reference: do not reintroduce ambient
 word scraps on the board. The spoken record lives in the Sentence panel and
 the kiosk phrase strip.
 
-### Hands-only word picking
+### Hands-only word picking (tried, removed)
 
-On the idle Teach tab the dictionary's recent words hang along the video edge
-as scraps; holding a wrist over one for ~1.2 s picks it into the word field and
-arms the hands-free re-arm, so a whole take can be taught without touching the
-keyboard. **Privacy constraint: the browser's built-in speech recognition (Web
+Dictionary words drawn on the video edge with dwell-to-pick were tried and
+removed: word labels floating on the stream read as clutter. Anti-reference:
+keep the video clear of word chrome on the Teach tab; reuse goes through the
+input's autocomplete and the hands-free right-hand re-arm after a save.
+**Privacy constraint stands: the browser's built-in speech recognition (Web
 Speech API) must never be used for word entry; in Chrome it ships audio to
 Google's servers, which breaks the app's core claim. On-device WASM speech
 (Vosk/Whisper) is acceptable future work.**
@@ -337,7 +338,6 @@ full-screen performance view, and per-code thresholds.
 - [x] Operator "back of the sheet" (hidden settings surface; model-switch guard)
 - [x] Mimetic first lesson + kiosk attract loop (copy the seed ghost)
 - [x] Visible rejection feedback (miss scraps, also in kiosk)
-- [x] Hands-only word picking (dwell over a word scrap)
 - [x] Stamped instruction strips; in-world dialogs replace confirm()/prompt()
 - [ ] On-device (WASM) speech-to-text for word entry; never the Web Speech API
 - [ ] Per-code threshold

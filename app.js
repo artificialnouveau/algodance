@@ -1366,7 +1366,10 @@ async function runFrame() {
           // torso in SQUARE units (matching stored seqs); cx/cy stay in
           // image units for anchoring.
           const torso = Math.hypot((shx - cx) * imgAspect(), shy - cy) || 1e-6;
-          liveFrame = { cx, cy, torso, at: now };
+          // Nose distance from the hip origin in torso units: the playback
+          // ghost calibrates its scale against this so its head lands on the
+          // performer's actual face, not on a standard body's proportions.
+          liveFrame = { cx, cy, torso, headDist: Math.hypot(vec[0], vec[1]), at: now };
         }
         const hands = updateHandsOnFace(lms, now);
         const nearNow = isNearFace();
@@ -1450,7 +1453,6 @@ async function runFrame() {
         if (teach && !teach.manual && !playback) { drawHandLabels(lms); }
         else if (!teach && currentTab === "teach" && !playback) {
           drawHandLabels(lms);
-          drawWordPicker(lms, now); // pick an existing word with a held-out hand
           // Say it before they hit Record, not after the take is wasted.
           if (!lastHandVis && !teachHandsLost) {
             teachHandsLost = true;
@@ -3338,7 +3340,21 @@ function drawPlayback(now) {
   const live = liveFrame && (now - liveFrame.at < 300);
   const ax = live ? liveFrame.cx : GHOST_CX;
   const ay = live ? liveFrame.cy : GHOST_CY;
-  const asc = live ? liveFrame.torso : GHOST_SCALE;
+  let asc = live ? liveFrame.torso : GHOST_SCALE;
+  if (live) {
+    // Torso length alone leaves the ghost's head floating off the
+    // performer's: bodies differ in head-to-hip proportion, and the stored
+    // skeleton (above all the synthetic seed) has its own. Calibrate during
+    // the count-in, while both hold the start pose, and hold that factor
+    // through the move so dancing never re-scales the ghost.
+    const g0 = cur.seq[0];
+    const gHead = Math.hypot(g0[0], g0[1]);
+    if (leading && liveFrame.headDist && gHead > 0.5) {
+      const r = Math.max(0.85, Math.min(1.2, liveFrame.headDist / gHead));
+      pb.scaleCal = pb.scaleCal == null ? r : pb.scaleCal + (r - pb.scaleCal) * 0.1;
+    }
+    if (pb.scaleCal) asc *= pb.scaleCal;
+  }
 
   if (showGhost) {
     // Onion-skin echoes (screened flat ink) under the moving figure.
@@ -4456,88 +4472,10 @@ setInterval(() => {
 }, 5000);
 window.addEventListener("pointerdown", () => { lastActivityAt = performance.now(); });
 
-// ---------- Hands-only word picking ----------
-// On the idle Teach tab, the dictionary's words hang along the video's edge
-// as paper scraps; holding a wrist over one for a moment picks it. With the
-// hands-free re-arm (right hand on face), a whole take can then be taught
-// without touching the keyboard once.
-const PICK_DWELL_MS = 1200;
-const PICK_R = 0.085; // hit radius around a scrap, image-normalized
-const PICK_X = 0.09;  // column position; mirrored to the viewer's right edge
-let pick = { word: null, since: 0 };
-function pickerWords() {
-  const seen = new Set();
-  const out = [];
-  for (let i = templates.length - 1; i >= 0 && out.length < 6; i--) {
-    const t = templates[i];
-    if ((t.family || "blaze") !== currentFamily) continue;
-    const k = t.word.toLowerCase();
-    if (!seen.has(k)) { seen.add(k); out.push(t.word); }
-  }
-  return out;
-}
-function drawWordPicker(lms, now) {
-  if (playback || teach) return;
-  const words = pickerWords();
-  if (!words.length) return;
-  const W = overlay.width, H = overlay.height;
-  const wrists = [lms[15], lms[16]].filter((p) => p && (p.visibility ?? 0) > 0.3);
-  let hovered = null;
-  octx.save();
-  octx.textBaseline = "middle";
-  octx.textAlign = "center";
-  words.forEach((word, i) => {
-    const cx = PICK_X;
-    const cy = 0.2 + i * 0.12;
-    let d = 1;
-    for (const p of wrists) d = Math.min(d, Math.hypot(p.x - cx, p.y - cy));
-    const near = d < PICK_R;
-    if (near && !hovered) hovered = word;
-    const label = word.length > 14 ? word.slice(0, 13) + "…" : word;
-    octx.font = `700 ${Math.max(11, Math.round(H * 0.028))}px "Courier Prime", monospace`;
-    const tw = octx.measureText(label).width;
-    const px = cx * W, py = cy * H;
-    const padX = 10, bh = Math.max(24, H * 0.052);
-    // The scrap. The canvas is CSS-mirrored, so the rect draws plain and only
-    // the text is locally flipped, like every other letter on this overlay.
-    octx.fillStyle = near ? "#ECFF00" : "rgba(244,238,224,.92)";
-    octx.strokeStyle = "rgba(28,24,21,.92)";
-    octx.lineWidth = 2;
-    octx.fillRect(px - tw / 2 - padX, py - bh / 2, tw + padX * 2, bh);
-    octx.strokeRect(px - tw / 2 - padX, py - bh / 2, tw + padX * 2, bh);
-    octx.save();
-    octx.translate(px, py + 1);
-    octx.scale(-1, 1);
-    octx.fillStyle = "#1C1815";
-    octx.fillText(label, 0, 0);
-    octx.restore();
-    if (near && pick.word === word) {
-      // Dwell progress: a red arc filling beside the scrap.
-      const prog = Math.min(1, (now - pick.since) / PICK_DWELL_MS);
-      octx.beginPath();
-      octx.strokeStyle = "#FF002A";
-      octx.lineWidth = 4;
-      octx.arc(px - tw / 2 - padX - 14, py, 9, -Math.PI / 2, -Math.PI / 2 + prog * TAU);
-      octx.stroke();
-    }
-  });
-  octx.restore();
-  if (hovered) {
-    if (pick.word !== hovered) {
-      pick.word = hovered;
-      pick.since = now;
-    } else if (now - pick.since >= PICK_DWELL_MS) {
-      pick.word = null;
-      wordInput.value = hovered;
-      rearmWord = hovered.toLowerCase(); // the face-cover now starts the take, hands-free
-      rearmSince = 0;
-      setTeachMsg(`Picked “${hovered}”. Cover your face with your RIGHT hand to record a take, no click needed.`, "ok");
-      tutNotify("word");
-    }
-  } else {
-    pick.word = null;
-  }
-}
+// Hands-only word picking (word labels drawn on the video with dwell-to-pick)
+// was tried and removed: labels floating on the stream read as clutter.
+// Reusing a word stays easy through the input's autocomplete list and the
+// hands-free right-hand re-arm after a save.
 
 // ---------- Helpers ----------
 function setTeachMsg(msg, cls) { teachMsg.textContent = msg; teachMsg.className = "teach-msg " + (cls || "muted"); }
@@ -4555,7 +4493,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v81 (2026-10-01)");
+  console.log("AlgoDance build v82 (2026-10-01)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();
