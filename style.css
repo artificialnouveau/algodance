@@ -73,6 +73,9 @@
   --paper-3: #D2C4A6;
   --ink:     #1C1815;
   --ink-soft:#5F5648;
+  /* Muted text on the DARKER paper: ink-soft only reaches 4.2:1 on paper-3,
+     so anything quiet sitting on that stock uses this deeper mix (5.4:1). */
+  --ink-soft-2:#4E463A;
 
   --panel-2: #EFE7D5;
   --text: var(--ink);
@@ -217,27 +220,15 @@ body {
   transform-origin: left center;
 }
 
-/* Horizontal / vertical switch, pinned to the header so it is always
-   reachable, especially FROM the rotated mode. */
-.orient {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.orient label { font-size: 12px; color: var(--muted); white-space: nowrap; }
-.orient select { width: auto; padding: 6px 10px; font-size: 13px; }
-
 .tabs { display: flex; gap: 8px; align-items: flex-end; }
 /* Each tab is its own little card, stuck on at its own angle. */
 .tab {
   position: relative;
   background: var(--paper-3);
   border: none;
-  color: var(--ink-soft);
-  padding: 7px 15px;
+  color: var(--ink-soft-2);
+  padding: 9px 15px;
+  min-height: 38px;
   border-radius: 0;
   cursor: pointer;
   font-family: var(--font-hand);
@@ -428,7 +419,9 @@ body.rot90 .video-wrap {
   background: rgba(255,255,255,.22);
 }
 .count-dots i.on { background: rgba(236,255,0,.85); }
-.count-dots i.cur { background: #FF002A; box-shadow: 0 0 12px rgba(255,0,42,.9); }
+/* The live count prints rather than glows: a red disc with its second ink
+   pass landing a hair off register, like every other joint mark. */
+.count-dots i.cur { background: #FF002A; box-shadow: 2px 2px 0 rgba(236,255,0,.85); }
 /* Teaching counts "1 2 3 4": the strip shows four dots, not eight. */
 .count-dots.four i:nth-child(n + 5) { display: none; }
 
@@ -441,22 +434,25 @@ body.rot90 .video-wrap {
   gap: 6px;
   z-index: 4;
 }
+/* Paper chips over the photo, not glassy screen pills: same stock as every
+   other control, readable against the video thanks to the cut edge + lift. */
 .pb-controls button {
   pointer-events: auto;
-  background: rgba(10, 10, 14, .65);
-  color: #ddd;
-  border: 1px solid rgba(255, 255, 255, .25);
-  border-radius: var(--r-pill);
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  font-family: var(--font-hand);
+  font-weight: 700;
   font-size: 12px;
   padding: 6px 12px;
-  min-height: 30px;
+  min-height: 32px;
+  box-shadow: var(--lift-1);
   cursor: pointer;
 }
 .pb-controls button.on {
-  background: #ECFF00;
-  color: #111;
-  border-color: #ECFF00;
-  font-weight: 700;
+  background: var(--yellow);
+  box-shadow: 2px 2px 0 var(--accent), var(--lift-1);
 }
 
 /* Warm-up offer on first Perform visit */
@@ -487,8 +483,8 @@ body.rot90 .video-wrap {
   cursor: pointer;
   font-size: 13px;
   /* Was a 13px glyph with 4px of padding: too small to hit on a phone. */
-  min-width: 24px;
-  min-height: 24px;
+  min-width: 28px;
+  min-height: 28px;
   padding: 0 2px 0 6px;
   transition: opacity var(--dur-1) var(--ease);
 }
@@ -514,7 +510,7 @@ body.rot90 .video-wrap {
     background: rgba(10, 10, 14, .75);
     backdrop-filter: blur(8px);
   }
-  .tagline, .orient { display: none; }
+  .tagline { display: none; }
   .logo { font-size: 18px; margin: 0; white-space: nowrap; }
   .tabs { display: flex; flex: 1; overflow-x: auto; gap: 6px; margin: 0; }
   .layout { display: block; padding: 0; }
@@ -534,21 +530,10 @@ body.rot90 .video-wrap {
     position: fixed;
     top: 52px; left: 10px; right: 10px;
     z-index: 25;
-    background: rgba(10, 10, 14, .6);
+    background: rgba(210,196,166,.92);
     border-radius: var(--r-sm);
     padding: 4px 10px;
   }
-  .model-row {
-    position: fixed;
-    top: 92px; left: 10px;
-    z-index: 24;
-    background: rgba(10, 10, 14, .6);
-    border-radius: var(--r-sm);
-    padding: 4px 8px;
-    margin: 0;
-  }
-  .model-row label { display: none; }
-  .model-row select { max-width: 52vw; }
   /* The side panel becomes a collapsible bottom sheet over the stream */
   .panel {
     position: fixed;
@@ -561,13 +546,18 @@ body.rot90 .video-wrap {
     transition: transform var(--dur-3) var(--ease);
   }
   body.sheet-collapsed .panel { transform: translateY(calc(100% + 2px)); }
+  /* The sheet toggle lives at the thumb, riding the sheet's top edge: it is
+     the control a one-handed visitor reaches for most. */
   .sheet-toggle {
     display: block;
     position: fixed;
-    right: 10px; top: 92px;
+    right: 10px;
+    top: auto;
+    bottom: calc(46dvh + 12px);
     z-index: 26;
   }
-  .pb-controls { top: 138px; bottom: auto; left: 10px; }
+  body.sheet-collapsed .sheet-toggle { bottom: 14px; }
+  .pb-controls { top: 96px; bottom: auto; left: 10px; }
   /* Reading tabs (About / AlgoDance) keep a full-screen panel */
   .layout.pdf-full .panel, .layout.content-full .panel {
     position: fixed;
@@ -626,7 +616,8 @@ body.rot90 .video-wrap {
   border-radius: 50%;
   background: var(--accent);
   margin-right: .3em;
-  box-shadow: 0 0 24px var(--accent);
+  /* Printed, not lit: the REC dot gets an off-register second pass, not a halo. */
+  box-shadow: 3px 3px 0 rgba(236,255,0,.8);
 }
 /* Over the photo, not on paper: keep the bright ink. */
 .big-status.saved { color: var(--yellow); }
@@ -680,24 +671,6 @@ body.rot90 .video-wrap {
   flex-shrink: 0;
 }
 
-.model-row {
-  width: fit-content;
-  max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--paper-3);
-  border: none;
-  border-radius: 0;
-  font-family: var(--font-hand);
-  padding: 8px 14px;
-  box-shadow: var(--shadow-card);
-}
-.model-row label { font-size: 13px; color: var(--muted); white-space: nowrap; }
-.model-row select { width: auto; flex: 1; max-width: 420px; }
 
 /* The working sheet: faintly ruled like a notebook, cut on all four edges,
    tilted the opposite way to the masthead so the stack reads as layers. */
@@ -786,6 +759,11 @@ select {
   background: var(--paper-2);
   color: var(--ink);
   padding: 8px 14px;
+  /* Touch floor: an installation is fingers, not cursors. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
   border-radius: 0;
   cursor: pointer;
   font-family: var(--font-hand);
@@ -832,7 +810,7 @@ select {
   box-shadow: 3px 3px 0 var(--accent), 5px 6px 14px rgba(28,24,21,.3);
 }
 .btn.block { width: 100%; }
-.btn.small { padding: 6px 10px; font-size: 13px; }
+.btn.small { padding: 6px 10px; font-size: 13px; min-height: 36px; }
 .btn.ghost { background: transparent; box-shadow: none; border-style: dashed; }
 .btn.danger { color: var(--warn); border-color: var(--ink); }
 
@@ -926,7 +904,7 @@ select {
 .ex-name { min-width: 0; overflow-wrap: anywhere; }
 .ex-name { font-size: 13px; color: var(--text); }
 .ex-date { color: var(--muted); font-size: 11px; margin-left: 8px; }
-.btn.tiny { padding: 3px 9px; font-size: 12px; }
+.btn.tiny { padding: 3px 10px; font-size: 12px; min-height: 30px; }
 
 .fam {
   display: inline-block; font-size: 10px; font-weight: 700;
@@ -1050,18 +1028,24 @@ body.kiosk .kiosk-phrase {
   pointer-events: none;
   z-index: 5;
 }
+/* The phrase as yellow scraps taped over the photo: the same recipe as the
+   big matched word, readable at the back of the room without glowing. */
 body.kiosk .kiosk-phrase .chip {
-  background: rgba(10, 10, 14, .62);
-  border: 1px solid rgba(236, 255, 0, .65);
-  color: #fff;
-  font-size: clamp(15px, 2.4vw, 26px);
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: clamp(16px, 2.4vw, 28px);
   padding: 6px 16px;
-  border-radius: var(--r-pill);
+  border-radius: 0;
+  box-shadow: 3px 4px 0 var(--accent), 5px 8px 18px rgba(0,0,0,.45);
 }
+body.kiosk .kiosk-phrase .chip:nth-child(2n) { transform: rotate(-1.4deg); }
+body.kiosk .kiosk-phrase .chip:nth-child(3n) { transform: rotate(1.2deg); }
 body.kiosk .topbar,
 body.kiosk .panel,
 body.kiosk .status-bar,
-body.kiosk .model-row,
 body.kiosk .header-toggle { display: none !important; }
 body.kiosk .layout { grid-template-columns: 1fr; padding: 0; gap: 0; }
 body.kiosk .video-wrap {
@@ -1082,16 +1066,19 @@ body.kiosk .video-wrap {
   right: 14px;
   z-index: 70;
   padding: 6px 14px;
-  border-radius: var(--r-pill);
-  border: 1px solid rgba(255,255,255,.25);
-  background: rgba(0,0,0,.45);
-  color: #fff;
+  min-height: 36px;
+  border-radius: 0;
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--font-hand);
+  font-weight: 700;
   font-size: 13px;
   cursor: pointer;
   opacity: .35;
   transition: opacity var(--dur-1) var(--ease);
 }
-.kiosk-exit:hover { opacity: 1; }
+.kiosk-exit:hover, .kiosk-exit:focus-visible { opacity: 1; }
 
 /* Collapsed header while reading the zine; the floating button restores it.
    The page behind the zine goes fully dark so no light border can peek out
@@ -1154,37 +1141,45 @@ body.header-collapsed .zine { min-height: 100vh; }
   from { transform: perspective(1400px) rotateY(-55deg); opacity: .25; }
   to { transform: none; opacity: 1; }
 }
+/* Paper tabs stuck to the dark reading room's wall, not glassy pills. */
 .zine-nav {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) rotate(-1deg);
   width: 52px;
   height: 76px;
-  border: none;
-  border-radius: var(--r-lg);
-  background: rgba(0,0,0,.35);
-  color: #fff;
-  font-size: 40px;
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 36px;
   line-height: 1;
   cursor: pointer;
-  opacity: .55;
+  opacity: .7;
+  box-shadow: var(--lift-1);
   transition: opacity var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.zine-nav:hover { opacity: 1; background: rgba(255,0,42,.55); }
+.zine-nav:hover, .zine-nav:focus-visible { opacity: 1; background: var(--yellow); }
 .zine-nav.prev { left: 14px; }
-.zine-nav.next { right: 14px; }
+.zine-nav.next { right: 14px; transform: translateY(-50%) rotate(1deg); }
 .zine-num {
   position: absolute;
   bottom: 12px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) rotate(-.6deg);
   padding: 3px 12px;
-  border-radius: var(--r-pill);
-  background: rgba(0,0,0,.5);
-  color: #fff;
+  border-radius: 0;
+  border: 1px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--font-hand);
   font-size: 13px;
   letter-spacing: .5px;
   pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .zine-nav, .zine-nav.next { transform: translateY(-50%); }
+  .zine-num { transform: translateX(-50%); }
 }
 .zine-load {
   position: absolute;
@@ -1193,7 +1188,8 @@ body.header-collapsed .zine { min-height: 100vh; }
   opacity: .8;
 }
 a { color: var(--blue); text-underline-offset: 3px; }
-a:hover { color: var(--accent); }
+/* The second-pass red: the bright ink only reaches 3.4:1 as text on paper. */
+a:hover { color: var(--accent-2); }
 
 /* Perform: match diagnosis log */
 .diag { margin-top: 14px; }
@@ -1234,18 +1230,32 @@ a:hover { color: var(--accent); }
 .chip-btn:nth-child(3n) { transform: rotate(-1.3deg); }
 .chip-btn:hover { background: var(--yellow); }
 
-/* Closest-guess hint on the video */
+/* Closest-guess hint on the video: a scrap taped to the photo's corner, in
+   the same stock as every other note. It also carries the miss scrap ("saw
+   that, nothing matched"), so a rejected move is never answered with silence. */
 .closest-hint {
   position: absolute;
   left: 12px; bottom: 12px;
-  padding: 3px 10px;
-  border-radius: var(--r-pill);
-  background: rgba(0,0,0,.55);
-  color: var(--yellow);
+  z-index: 4;
+  max-width: min(78%, 440px);
+  padding: 6px 12px;
+  background: var(--yellow);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  font-family: var(--font-hand);
   font-size: 13px;
+  font-weight: 700;
   letter-spacing: .3px;
+  box-shadow: var(--lift-1);
+  transform: rotate(-.8deg);
   pointer-events: none;
 }
+.closest-hint.miss { background: var(--paper-2); }
+body.kiosk .closest-hint {
+  left: 18px; bottom: 18px;
+  font-size: clamp(14px, 2vw, 22px);
+}
+@media (prefers-reduced-motion: reduce) { .closest-hint { transform: none; } }
 
 /* First-run framing hint */
 /* A post-it stuck on the corner of the photo. It used to sit in the stage
@@ -1278,7 +1288,6 @@ a:hover { color: var(--accent); }
 /* Handwritten on the pad, in the collage world. */
 .intro-hint p { font-family: var(--font-hand); font-size: 14px; }
 @media (prefers-reduced-motion: reduce) { .intro-hint { transform: none; } }
-.intro-hint b { color: var(--accent); }
 
 /* The guided-tutorial coach: the same post-it, tilted the other way, with a
    step counter. Shares .intro-hint for the stock, shadow and mobile float. */
@@ -1356,7 +1365,7 @@ body.rot90 .layout { grid-template-columns: 1fr; }
   .topbar::before, .topbar::after { display: none; }
   .topbar { background: rgba(244,238,224,.94); backdrop-filter: blur(8px); }
   .panel { background: var(--paper-2); }
-  .status-bar, .model-row { background: rgba(210,196,166,.92); }
+  .status-bar { background: rgba(210,196,166,.92); }
 }
 body.kiosk .video-wrap,
 .layout.pdf-full .panel,
@@ -1418,7 +1427,7 @@ body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
 
 @media (max-width: 900px) {
   /* Pinned by left/right on phones, so the desktop shrink-wrap must not apply. */
-  .status-bar, .model-row { width: auto; }
+  .status-bar { width: auto; }
   /* The video is fixed and fullscreen on phones, so the note has to float
      over it or it sits underneath and is never seen. */
   .intro-hint {
@@ -1448,5 +1457,214 @@ body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
   border-top: 1.5px solid var(--ink);
   list-style: revert;
 }
-.more > summary:hover { color: var(--accent); }
+.more > summary:hover { color: var(--accent-2); }
 .more[open] > summary { margin-bottom: 4px; }
+
+/* ===========================================================================
+   Installation round: stamps, the word wall, the back of the sheet
+   ========================================================================= */
+
+/* Instructions are STAMPED, one imperative per scrap, instead of typed as
+   paragraphs: the collage's own four-panel strip. The lead block is the kind
+   of numeral stamp the zine uses. */
+.stamp-steps { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.stamp-steps .stamp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  padding: 7px 10px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: var(--lift-1);
+}
+.stamp-steps .stamp b {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 900;
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--accent);
+}
+.stamp-steps .stamp:nth-child(2n) { transform: rotate(.5deg); }
+.stamp-steps .stamp:nth-child(2n + 1) { transform: rotate(-.5deg); }
+
+/* The sensitivity slider's two ends, named so the control cannot fight its
+   own label. */
+.range-ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-family: var(--font-hand);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.range-ends i { font-style: normal; }
+
+/* Attract caption: taped under the looping seed ghost, the installation's
+   standing invitation. */
+.attract-note {
+  position: absolute;
+  left: 50%;
+  bottom: 7%;
+  transform: translateX(-50%) rotate(-1.2deg);
+  z-index: 4;
+  max-width: 86%;
+  text-align: center;
+  background: var(--yellow);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: clamp(14px, 2.2vw, 22px);
+  padding: 8px 16px;
+  box-shadow: 3px 4px 0 var(--accent), 5px 8px 18px rgba(0,0,0,.45);
+  pointer-events: none;
+}
+.attract-note b { font-family: var(--font-display); font-weight: 900; letter-spacing: .02em; }
+
+/* The word wall: everything the installation has ever spoken, taped to the
+   tiles UNDER the paper surfaces (first in the DOM, z-index 0), so words peek
+   out of the gutters and the wall slowly disappears under language. */
+.word-wall {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.word-wall .wall-word {
+  position: absolute;
+  transform: rotate(var(--wr, 0deg));
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid rgba(28,24,21,.6);
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1.1;
+  padding: .08em .35em .14em;
+  box-shadow: var(--lift-1);
+  white-space: nowrap;
+}
+.word-wall .wall-word.y {
+  background: var(--yellow);
+  box-shadow: 2px 3px 0 var(--accent), 3px 6px 12px rgba(20,34,44,.26);
+}
+@media (max-width: 900px) { .word-wall { display: none; } }
+body.kiosk .word-wall,
+body.header-collapsed .word-wall { display: none; }
+
+/* The registration mark is the latch for the back of the sheet: it has to
+   accept the press its container refuses. */
+.mm-marks .reg { pointer-events: auto; cursor: pointer; }
+
+/* The back of the sheet: the operator side, pencil notes on the reverse of
+   the paper. Opened by holding the registration mark; never part of the
+   visitor surface. */
+.back-board {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(20, 26, 31, .5);
+}
+.back-sheet {
+  width: min(440px, 100%);
+  max-height: calc(100dvh - 36px);
+  overflow: auto;
+  background:
+    repeating-linear-gradient(0deg, rgba(20,65,122,.05) 0 1px, rgba(0,0,0,0) 1px 26px),
+    var(--paper-2);
+  padding: 20px 18px;
+  box-shadow: var(--lift-2);
+  transform: rotate(.4deg);
+}
+.back-sheet h2 {
+  margin: 0 0 4px;
+  font-family: var(--font-hand);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 4px;
+}
+.back-sheet h3 {
+  margin: 20px 0 8px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 3px;
+}
+.back-sheet .back-access {
+  margin-top: 16px;
+  font-family: var(--font-hand);
+  font-size: 12px;
+}
+.back-sheet #backClose { margin-top: 10px; }
+
+/* In-world confirm / rename scrap, replacing the browser's confirm()/prompt(). */
+.paper-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(20, 26, 31, .5);
+}
+.paper-dialog-card {
+  width: min(360px, 100%);
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  padding: 16px;
+  box-shadow: var(--lift-2);
+  transform: rotate(-.5deg);
+}
+.paper-dialog-card p {
+  margin: 0 0 12px;
+  font-family: var(--font-hand);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.paper-dialog-card input[type="text"] { margin-bottom: 12px; }
+.paper-dialog-card .row-actions { justify-content: flex-end; }
+
+/* The locked tutorial step says WHY in writing on the card, not in a tooltip
+   a touchscreen never shows. */
+.tut-lock {
+  margin: 8px 0 0;
+  font-family: var(--font-hand);
+  font-size: 12px;
+  font-weight: 700;
+  color: #6B5E18;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-steps .stamp,
+  .back-sheet,
+  .paper-dialog-card,
+  .word-wall .wall-word { transform: none; }
+  .attract-note { transform: translateX(-50%); }
+}

@@ -6,11 +6,18 @@
   <title>AlgoDance: Code a movement</title>
   <link rel="preload" href="fonts/bodoni-moda-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/courier-prime-latin-400.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="style.css?v=75" />
+  <link rel="stylesheet" href="style.css?v=76" />
 </head>
 <body>
+  <!-- The word wall: every word the installation has ever spoken, taped to the
+       tiles behind the paper surfaces. First in the body so it paints under
+       everything else. Decorative to AT; the Sentence panel carries the text. -->
+  <div id="wordWall" class="word-wall" aria-hidden="true"></div>
+
   <!-- Collage furniture: printer's crop marks and a registration target, the
-       marks a paste-up leaves behind. Decorative, never announced to AT. -->
+       marks a paste-up leaves behind. Decorative, never announced to AT.
+       The registration target doubles as the latch for the back of the sheet:
+       hold it for two seconds (or Shift+O) to flip to the operator side. -->
   <div class="mm-marks" aria-hidden="true">
     <i class="cm tl"></i><i class="cm tr"></i><i class="cm bl"></i><i class="cm br"></i>
     <svg class="reg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="12"/><path d="M20 2v36M2 20h36"/></svg>
@@ -44,13 +51,6 @@
   <button id="kioskExit" class="kiosk-exit" hidden>Exit kiosk</button>
 
   <header class="topbar">
-    <div class="orient">
-      <label for="orientSel">Layout</label>
-      <select id="orientSel">
-        <option value="landscape">Horizontal</option>
-        <option value="rotated">Vertical (rotated 90)</option>
-      </select>
-    </div>
     <h1 class="logo" aria-label="AlgoDance"><span aria-hidden="true"><i style="color:#E40303">A</i><i style="color:#FF8C00">l</i><i style="color:#FFED00">g</i><i style="color:#008026">o</i><i style="color:#004DFF">D</i><i style="color:#750787">a</i><i style="color:#E40303">n</i><i style="color:#FF8C00">c</i><i style="color:#008026">e</i></span></h1>
     <p class="tagline">Code a movement.</p>
     <nav class="tabs" role="tablist" aria-label="Sections">
@@ -66,7 +66,7 @@
   <main class="layout">
     <section class="stage">
       <div id="introHint" class="intro-hint" hidden>
-        <p>Stand back so your <b>head, shoulders and hands</b> are in view. When glowing dots appear on your joints, you're being tracked; your head, hands and feet leave light trails as you move.</p>
+        <p>Prop the camera so your <b>head, shoulders and hands</b> are in view. Ink discs printed on your joints mean you are being tracked; your head, hands and feet leave marker trails as you move.</p>
         <button id="introDismiss" class="btn small">Got it</button>
       </div>
 
@@ -76,6 +76,7 @@
       <div id="tutCard" class="intro-hint tut-card" hidden>
         <div id="tutStepLabel" class="tut-step"></div>
         <p id="tutText"></p>
+        <div id="tutLock" class="tut-lock" hidden></div>
         <div class="tut-actions">
           <button id="tutBack" class="btn ghost small">Back</button>
           <button id="tutNext" class="btn small">Next</button>
@@ -105,26 +106,13 @@
         <div id="bigStatus" class="big-status" aria-live="assertive"></div>
         <!-- Kiosk mode: the phrase, mirrored over the video for the audience -->
         <div id="kioskPhrase" class="kiosk-phrase" aria-hidden="true"></div>
+        <!-- Attract caption: taped under the looping seed ghost. -->
+        <div id="attractNote" class="attract-note" hidden></div>
         <div id="closestHint" class="closest-hint" hidden></div>
       </div>
       <div class="status-bar">
         <span id="countdown" class="pill" hidden></span>
         <div id="status" class="status-text" aria-live="polite">Starting…</div>
-      </div>
-      <div class="model-row">
-        <label for="modelSel">Pose algorithm</label>
-        <select id="modelSel">
-          <optgroup label="MediaPipe BlazePose (33 points)">
-            <option value="blaze-lite">BlazePose Lite (fastest)</option>
-            <option value="blaze-full">BlazePose Full (recommended for dance)</option>
-            <option value="blaze-heavy">BlazePose Heavy (most accurate)</option>
-          </optgroup>
-          <optgroup label="MoveNet / TensorFlow.js (17 points)">
-            <option value="movenet-lightning">MoveNet Lightning (fast)</option>
-            <option value="movenet-thunder">MoveNet Thunder (accurate)</option>
-          </optgroup>
-        </select>
-        <label class="check inline"><input type="checkbox" id="cutoutToggle" /> Cut out background</label>
       </div>
     </section>
 
@@ -132,10 +120,10 @@
       <!-- PERFORM -->
       <div class="tabpane" data-pane="perform" id="pane-perform" role="tabpanel" aria-labelledby="tab-perform" hidden>
         <h2>Perform</h2>
-        <p class="muted">Just perform. When a movement matches a saved code, its word or phrase appears above your head and joins the sentence below. Holding a pose for half a second counts too. <b>Keep at least one hand in view</b>, matching pauses while both are hidden.</p>
+        <p class="muted">Dance a saved move and its word appears over your head and joins the sentence. Holding a pose for half a second counts too. <b>Keep at least one hand in view.</b></p>
 
         <div id="warmupOffer" class="warmup" hidden>
-          <span>Warm up first? Dance each of your codes once, with counts, before matching starts.</span>
+          <span>Warm up first? Dance each of your moves once, with counts, before matching starts.</span>
           <span class="row-actions">
             <button id="warmupYes" class="btn small">Warm up</button>
             <button id="warmupNo" class="btn ghost small">Skip</button>
@@ -143,12 +131,12 @@
         </div>
 
         <div class="performable">
-          <h3>Your codes</h3>
+          <h3>Your moves</h3>
           <div id="performList" class="chips" aria-live="polite"></div>
         </div>
 
         <div class="meter">
-          <div class="meter-row"><span>Closest code</span><b id="bestWord">—</b></div>
+          <div class="meter-row"><span>Closest move</span><b id="bestWord">—</b></div>
           <div class="meter-row"><span>Match strength</span><b id="matchPct">—</b></div>
           <div class="bar"><div id="bar" class="bar-fill"></div></div>
         </div>
@@ -161,7 +149,7 @@
             <button id="clearPhrase" class="btn ghost small" title="Empty the sentence and start again">Clear</button>
           </div>
         </div>
-        <small class="muted">Every word or phrase you perform is added here, one after another, so a run of codes builds a sentence. It is only what you have said so far; use Clear to start a new one.</small>
+        <small class="muted">Each performed word lands here, building a sentence.</small>
         <div id="phrase" class="phrase" aria-live="polite"></div>
 
         <details class="more">
@@ -169,20 +157,21 @@
           <div class="routine">
             <div id="routineList" class="chips"></div>
             <div class="row-actions">
-              <select id="routineAdd"><option value="">Add a code…</option></select>
+              <select id="routineAdd"><option value="">Add a move…</option></select>
               <button id="routineStart" class="btn small">Start routine</button>
               <button id="routineClear" class="btn ghost small">Clear</button>
             </div>
-            <small class="muted">Chain codes into a choreography. Each move is cued by name, counted in, performed from memory, and scored; you get a routine score at the end.</small>
+            <small class="muted">Chain moves into a choreography: each one is cued by name, counted in, performed from memory, and scored.</small>
           </div>
         </details>
 
         <details class="more">
           <summary>Tuning</summary>
           <label class="field">
-            <span>Sensitivity <em id="threshVal"></em></span>
+            <span>Matching <em id="threshVal"></em></span>
             <input id="thresh" type="range" min="0.06" max="0.6" step="0.01" value="0.28" />
-            <small class="muted">Left = stricter, right = looser. Codes with several examples auto-calibrate; this scales that.</small>
+            <div class="range-ends" aria-hidden="true"><i>strict</i><i>loose</i></div>
+            <small class="muted">Strict fires fewer, surer matches. Words with several takes calibrate themselves; this scales that.</small>
           </label>
 
           <label class="field">
@@ -191,18 +180,12 @@
               <option value="auto">Continuous (watch and match automatically)</option>
               <option value="manual">Manual (hold the button or Spacebar)</option>
             </select>
-            <small class="muted">Manual mode captures only while you hold, a fallback for noisy backgrounds or precise control.</small>
+            <small class="muted">Manual captures only while you hold the button or Spacebar.</small>
           </label>
           <button id="holdBtn" class="btn block" hidden>Hold to capture (or Space)</button>
 
           <label class="check"><input type="checkbox" id="soundToggle" checked /> Ping on match</label>
-          <label class="check"><input type="checkbox" id="speakToggle" checked /> Speak the matched word or phrase aloud</label>
-
-          <button id="bgBtn" class="btn small block">Calibrate my idle movement</button>
-          <small class="muted">Takes 10 seconds, once per algorithm: move around casually without performing any of your codes. Codes then only fire when a movement resembles them more than your own idle movement.</small>
-
-          <button id="kioskBtn" class="btn ghost small block">Enter kiosk mode</button>
-          <small class="muted">Fullscreen performance view for an installation: the camera fills the screen and every control disappears.</small>
+          <label class="check"><input type="checkbox" id="speakToggle" checked /> Speak matched words aloud</label>
         </details>
 
         <details class="diag">
@@ -211,24 +194,30 @@
         </details>
       </div>
 
-      <!-- HOW IT WORKS: the opening page for visitors with nobody to explain -->
+      <!-- HOW IT WORKS: the opening page for visitors with nobody to explain.
+           The real first lesson is on the video: the seed ghost loops and
+           copying it fires the word. This panel is the written fallback. -->
       <div class="tabpane" data-pane="howto" id="pane-howto" role="tabpanel" aria-labelledby="tab-howto">
         <h2>How it works</h2>
-        <p class="muted">AlgoDance is a crowdsourced movement dictionary: it starts with one built-in move (also called AlgoDance), and everyone who visits can add to it, including you. Invent a short move, teach it a word or phrase, and it joins the dictionary; then speak by dancing. Everything happens on this device; nothing is filmed or uploaded.</p>
-        <ol class="steps muted">
-          <li><b>Teach.</b> Type a word or phrase and record one short move for it, four counts long ("1, 2, 3, 4"). You start and stop the recording by covering your face with your right, then your left hand.</li>
-          <li><b>Perform.</b> Dance your move and the computer shows your word or phrase and says it out loud.</li>
-          <li><b>Build.</b> Teach more moves and dance whole sentences. Your moves are saved on this computer, so they are still here tomorrow.</li>
-        </ol>
+        <p class="muted">AlgoDance is a crowd-built movement dictionary. Invent a short move, teach it a word or phrase, then speak by dancing. Everything stays on this device; nothing is filmed or uploaded.</p>
+        <div class="stamp-steps">
+          <span class="stamp"><b>1</b> TYPE a word</span>
+          <span class="stamp"><b>2</b> RIGHT hand on your face, hold for 3-2-1</span>
+          <span class="stamp"><b>3</b> DANCE one short move, four counts</span>
+          <span class="stamp"><b>4</b> LEFT hand on your face saves it</span>
+        </div>
         <button id="tutStartBtn" class="btn primary block">Guide me through it</button>
-        <p class="muted">The guide walks you through teaching and performing your first word or phrase, one step at a time.</p>
         <button id="tutSelfBtn" class="btn ghost block">I'll explore on my own</button>
+        <details class="more">
+          <summary>The fine print</summary>
+          <p class="muted">The ghost on the video is dancing the dictionary's first move, AlgoDance. Copy it and its word fires; that is the whole idea. Your moves are saved in this browser, so they are still here tomorrow. The hand-on-face moments are trimmed off every recording, so only the move itself is kept.</p>
+        </details>
       </div>
 
       <!-- TEACH -->
       <div class="tabpane" data-pane="teach" id="pane-teach" role="tabpanel" aria-labelledby="tab-teach" hidden>
-        <h2>Teach a new code</h2>
-        <p id="teachHint" class="teach-hint"><b>Ready.</b> Type a word or phrase below and press <b>Record movement</b>. New here? The <b>How it works</b> tab walks you through it.</p>
+        <h2>Teach a move</h2>
+        <p id="teachHint" class="teach-hint"><b>Ready.</b> Type or pick a word, then press <b>Record movement</b>.</p>
 
         <label class="field">
           <span>Word or phrase</span>
@@ -240,31 +229,36 @@
         <p id="teachMsg" class="teach-msg muted"></p>
         <div id="teachPreview" class="pose-strip-wrap" hidden></div>
 
-        <ol class="steps muted">
-          <li>Make <b>one short move, just four counts long</b> ("1, 2, 3, 4"). Not a whole dance, one gesture.</li>
-          <li>Cover your face with your <b>right hand</b> (the big <b>R</b>) and hold for the 3-2-1 countdown. Recording starts at zero.</li>
-          <li>Perform your move, then cover your face with your <b>left hand</b> (the big <b>L</b>) and hold for the 3-2-1 countdown to stop and save.</li>
-        </ol>
-        <p class="muted">The hand-to-face moments are trimmed automatically, so only your movement is saved. Record the same word or phrase more than once to add examples and make it easier to recognize.</p>
+        <div class="stamp-steps">
+          <span class="stamp"><b>R</b> RIGHT hand on your face, hold for 3-2-1</span>
+          <span class="stamp"><b>4</b> DANCE one short move, four counts</span>
+          <span class="stamp"><b>L</b> LEFT hand on your face saves it</span>
+        </div>
+        <p class="muted">The R and L are printed on your wrists on screen. Record the same word again to add takes; three takes match best.</p>
 
-        <label class="field">
-          <span>Tempo</span>
-          <input id="bpmInput" type="number" min="60" max="160" step="1" value="107" /> BPM
-          <small class="muted">While recording, a metronome counts "1, 2, 3, 4" at this tempo. Teach your movement ON the counts and it will play back, step through, and chain far more naturally.</small>
-        </label>
+        <button id="manualHintBtn" class="btn ghost small block">Can't use the face trigger? Record with a button instead</button>
+
+        <details class="more">
+          <summary>Tempo and fine print</summary>
+          <label class="field">
+            <span>Tempo</span>
+            <input id="bpmInput" type="number" min="60" max="160" step="1" value="107" /> BPM
+            <small class="muted">A metronome counts 1, 2, 3, 4 at this tempo while you record. Moves taught on the counts play back and chain more naturally.</small>
+          </label>
+          <small class="muted">The hand-on-face moments are trimmed automatically, so only your move is saved. To reuse an existing word without typing, hold a hand over its floating scrap on the video for a moment.</small>
+        </details>
       </div>
 
       <!-- CODES -->
       <div class="tabpane" data-pane="codes" id="pane-codes" role="tabpanel" aria-labelledby="tab-codes" hidden>
-        <h2>Saved codes</h2>
+        <h2>The dictionary</h2>
         <div class="codes-actions">
           <button id="exportBtn" class="btn ghost small">Export</button>
           <button id="importBtn" class="btn ghost small">Import</button>
-          <button id="clearAll" class="btn ghost small danger">Delete all</button>
           <input id="importFile" type="file" accept="application/json" hidden />
         </div>
-        <p class="muted"><b>Export</b> saves all your moves as a small file (skeleton coordinates only, never video), so you can back them up or share them with someone. <b>Import</b> loads a file like that, yours or a friend's, and adds those moves to your own. <b>Delete all</b> wipes every saved code from this browser.</p>
-        <p class="muted">Your moves are saved on this computer or tablet, so they are still here tomorrow. They disappear if the browser's data is cleared, so use <b>Export</b> to keep a copy. Click a word or phrase (or Play all) to dance along with the ghost skeleton. When a code has several examples, each one can be played or deleted on its own.</p>
+        <p id="codesMsg" class="teach-msg muted"></p>
+        <p class="muted">Every move lives in this browser, so it is still here tomorrow. <b>Export</b> saves them all as a small file of skeleton coordinates, never video; <b>Import</b> adds a friend's file to yours. Click a word (or Play) to dance along with its ghost.</p>
         <ul id="codeList" class="code-list"></ul>
       </div>
 
@@ -278,8 +272,8 @@
         <ul class="about-list muted">
           <li><b>No data is sent to us.</b> There is no server, no account, and no analytics. We never see your camera, your movements, or your words.</li>
           <li><b>Your camera stays on your device.</b> Video is processed frame by frame in the browser to detect body pose and is never uploaded, recorded, or stored. No video ever leaves your computer.</li>
-          <li><b>Only coordinates are saved.</b> A saved code is just a short sequence of skeleton coordinates, stored in your browser's local storage. No images.</li>
-          <li><b>You are in control.</b> Export or delete your codes anytime in the Codes tab. Clearing your browser storage removes everything.</li>
+          <li><b>Only coordinates are saved.</b> A saved move is just a short sequence of skeleton coordinates, stored in your browser's local storage. No images.</li>
+          <li><b>You are in control.</b> Export or delete your moves anytime in the Codes tab. Clearing your browser storage removes everything.</li>
           <li><b>Third-party models.</b> The pose models (MediaPipe BlazePose, and optionally MoveNet) download once from public CDNs so detection can run on your device. That is a normal file download; your camera data is not part of it. Everything else the page needs, including its fonts, is served from this site, so opening it tells no one else you did.</li>
         </ul>
 
@@ -303,6 +297,72 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=75"></script>
+  <!-- The back of the sheet: the operator side. Opened by holding the
+       registration mark (or the wordmark on a phone) for two seconds, or
+       Shift+O. Everything that can reconfigure or wipe the installation
+       lives here, off the visitor surface. -->
+  <div id="backBoard" class="back-board" hidden>
+    <div class="back-sheet" role="dialog" aria-modal="true" aria-label="Operator settings">
+      <h2>Back of the sheet</h2>
+      <p class="muted">Operator settings. Turn the sheet back over before leaving the installation.</p>
+
+      <label class="field">
+        <span>Pose algorithm</span>
+        <select id="modelSel">
+          <optgroup label="MediaPipe BlazePose (33 points)">
+            <option value="blaze-lite">BlazePose Lite (fastest)</option>
+            <option value="blaze-full">BlazePose Full (recommended for dance)</option>
+            <option value="blaze-heavy">BlazePose Heavy (most accurate)</option>
+          </optgroup>
+          <optgroup label="MoveNet / TensorFlow.js (17 points)">
+            <option value="movenet-lightning">MoveNet Lightning (fast)</option>
+            <option value="movenet-thunder">MoveNet Thunder (accurate)</option>
+          </optgroup>
+        </select>
+        <small class="muted">Moves only match the algorithm family they were taught with; switching families pauses the other family's moves.</small>
+      </label>
+
+      <label class="field">
+        <span>Layout</span>
+        <select id="orientSel">
+          <option value="landscape">Horizontal</option>
+          <option value="rotated">Vertical (rotated 90)</option>
+        </select>
+      </label>
+
+      <label class="check"><input type="checkbox" id="cutoutToggle" /> Cut out the background (BlazePose only)</label>
+
+      <button id="bgBtn" class="btn block">Calibrate idle movement (10s)</button>
+      <small class="muted">Once per algorithm, on the Perform tab: move casually without performing. Moves then only fire when they beat that idle movement.</small>
+
+      <button id="kioskBtn" class="btn block">Enter kiosk mode</button>
+      <small class="muted">Fullscreen installation view: the camera fills the screen and every control disappears. Esc exits.</small>
+
+      <h3>The dictionary</h3>
+      <div class="row-actions">
+        <button id="clearAll" class="btn ghost small danger">Delete all moves</button>
+        <button id="wallClear" class="btn ghost small danger">Clear the word wall</button>
+      </div>
+      <small class="muted">Delete all downloads a backup file first, so Import can undo it.</small>
+
+      <p class="muted back-access">This side opens by holding the registration mark in the corner for two seconds (the wordmark on a phone), or Shift+O.</p>
+      <button id="backClose" class="btn primary block">Turn the sheet back over</button>
+    </div>
+  </div>
+
+  <!-- In-world confirm / rename: the same questions a browser confirm() would
+       ask, on a scrap of the app's own paper. -->
+  <div id="paperDialog" class="paper-dialog" hidden>
+    <div class="paper-dialog-card" role="dialog" aria-modal="true" aria-labelledby="pdMsg">
+      <p id="pdMsg"></p>
+      <input id="pdInput" type="text" maxlength="60" hidden />
+      <div class="row-actions">
+        <button id="pdCancel" class="btn ghost small">Cancel</button>
+        <button id="pdOk" class="btn primary small">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js?v=76"></script>
 </body>
 </html>

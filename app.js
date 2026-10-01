@@ -672,6 +672,7 @@ async function switchAlgo(key) {
   algoChoice = key;
   localStorage.setItem(ALGO_STORE_KEY, key);
   if (teach) cancelTeach();
+  stopAttract();
   moving = false;
   ready = false;
   try { backend?.close(); } catch {}
@@ -1439,6 +1440,7 @@ async function runFrame() {
         if (teach && !teach.manual && !playback) { drawHandLabels(lms); }
         else if (!teach && currentTab === "teach" && !playback) {
           drawHandLabels(lms);
+          drawWordPicker(lms, now); // pick an existing word with a held-out hand
           // Say it before they hit Record, not after the take is wasted.
           if (!lastHandVis && !teachHandsLost) {
             teachHandsLost = true;
@@ -1952,7 +1954,9 @@ function performStep(vec, now, face, conf) {
   }
   if (!ranked) {
     diag("move rejected: no code with comparable energy/excursion");
-    setBar(0); hideClosest(); return;
+    setBar(0);
+    showMissScrap("Saw that. Nothing matched yet; make your move bigger and sharper.");
+    return;
   }
   const { best, second, thresh } = showScore(ranked);
   const ambiguous = second && (second.dist - best.dist) < AMBIG_GAP_FRAC * thresh;
@@ -1979,6 +1983,9 @@ function performStep(vec, now, face, conf) {
     if (best.dist < thresh * 1.5) {
       const pct2 = Math.max(0, Math.min(100, (1 - best.dist / thresh) * 100));
       showClosest(best.word, pct2, coachTip(ambiguous ? "ambiguous" : !beatsBg ? "bg" : "far", second));
+    } else {
+      // A far miss used to be silent; silence reads as "it's broken".
+      showMissScrap(`Saw that. Closest was “${best.word}” but far off; exaggerate the move.`);
     }
   }
 }
@@ -1990,11 +1997,37 @@ function coachTip(gate, second) {
   return "almost, finish the move cleanly and hold the last pose a beat";
 }
 function showClosest(word, pct, tip) {
+  missUntil = 0;
+  closestHintEl.classList.remove("miss");
   closestHintEl.hidden = false;
-  closestHintEl.textContent = `closest: ${word} · ${Math.round(pct)}%` + (tip ? ` — ${tip}` : "");
+  closestHintEl.textContent = `closest: ${word} · ${Math.round(pct)}%` + (tip ? `. ${tip}` : "");
   closestHintEl.style.opacity = (0.35 + 0.6 * pct / 100).toFixed(2);
 }
-function hideClosest() { closestHintEl.hidden = true; }
+function hideClosest(force) {
+  if (!force && performance.now() < missUntil) return; // a miss scrap finishes its say
+  closestHintEl.classList.remove("miss");
+  closestHintEl.hidden = true;
+}
+// A completed move that matched NOTHING used to get silence, which a dancer
+// reads as "it can't see me". Every outright rejection now answers with a
+// quiet paper scrap that fades on its own. Rate-limited so a flailing visitor
+// is coached, not spammed; immune to the idle-frame hideClosest until it has
+// been up long enough to read.
+let missUntil = 0;
+let lastMissAt = 0;
+const MISS_GAP_MS = 4000;
+const MISS_SHOW_MS = 3000;
+function showMissScrap(text) {
+  const now = performance.now();
+  if (now - lastMissAt < MISS_GAP_MS) return;
+  lastMissAt = now;
+  missUntil = now + MISS_SHOW_MS;
+  closestHintEl.hidden = false;
+  closestHintEl.classList.add("miss");
+  closestHintEl.textContent = text;
+  closestHintEl.style.opacity = "";
+  setTimeout(() => hideClosest(), MISS_SHOW_MS + 50);
+}
 
 const DEFAULT_SENS = 0.28;    // slider midpoint the auto thresholds scale against
 const AMBIG_GAP_FRAC = 0.25;  // second-best must be at least this much farther
@@ -2297,12 +2330,14 @@ function setPerformState() {
     statusEl.textContent = manualCapturing ? "● Capturing movement…" : "● Ready. Hold the button to capture.";
     return;
   }
-  statusEl.textContent = "● Watching — perform a saved code and its label will appear.";
+  statusEl.textContent = "● Watching. Perform a saved move and its word will appear.";
 }
 
 function fireWord(word, now) {
   lastFireAt = now;
   lastFiredWord = word;
+  lastActivityAt = now;
+  addToWall(word); // the wall keeps everything the installation has said
   // Reveal word, ping and riso flash together, timed to when the speech
   // engine actually starts talking, so eye and ear get the word at once.
   const reveal = () => {
@@ -2669,10 +2704,12 @@ function finishTeach(now, timedOut = false) {
   // recordings too: a capture that never really went anywhere is not a code.
   if (core.length < 3) {
     setTeachMsg("The recording ended up too short to save. Give it a beat between starting (R hand) and stopping (L hand), and check the skeleton overlay is tracking you.", "warn");
+    tutCaptureFailed();
     return;
   }
   if (travelOf(core) < MIN_TRAVEL) {
     setTeachMsg("Too little movement was seen between start and stop. Tracking works best when your hands stay inside the frame; step back a little, or make the movement bigger.", "warn");
+    tutCaptureFailed();
     return;
   }
   // Duration must describe the TRIMMED movement, not the whole recording:
@@ -2933,6 +2970,13 @@ sheetToggle?.addEventListener("click", () => {
   sheetToggle.textContent = collapsed ? "Show panel" : "Hide panel";
 });
 function stopPlayback() {
+  // If the attract loop is what is stopping, its caption must go with it,
+  // whoever initiated the stop.
+  if (playback?.key === "attract" && attractArmed) {
+    attractArmed = false;
+    clearTimeout(attractNoteTimer);
+    attractNote.hidden = true;
+  }
   playback = null;
   danceCount.hidden = true;
   countDots.hidden = true;
@@ -3192,7 +3236,12 @@ function drawPlayback(now) {
     pb.lastCount = 0;
     pb.stepDone = 0;
     if (pb.idx >= pb.items.length) {
-      if (pbLoop) { pb.idx = 0; return; }
+      if (pbLoop) {
+        pb.idx = 0;
+        // Attract loop: each completed cycle scores what the visitor danced.
+        if (pb.key === "attract") attractCycleEnd(now);
+        return;
+      }
       stopPlayback();
       return;
     }
@@ -3384,6 +3433,8 @@ function drawPlayback(now) {
     statusEl.textContent = pb.result.msg;
   } else if (ph === "done") {
     statusEl.textContent = pb.summary;
+  } else if (pb.key === "attract") {
+    statusEl.textContent = "The ghost is dancing ALGODANCE. Dance along and it will answer.";
   } else {
     statusEl.textContent =
       (rehearse ? `Rehearsing “${pb.label}”: watch first` : `Playing “${cur._label || pb.label}”`) +
@@ -3436,7 +3487,7 @@ function renderCodeList() {
     let html = `
       <div class="code-head">
         <div class="code-info" data-act="play" data-word="${w}" title="Play this movement">
-          <div class="word">${escapeHtml(g.word)}<span class="count">${count} example${count > 1 ? "s" : ""}</span></div>
+          <div class="word">${escapeHtml(g.word)}<span class="count">${count} take${count > 1 ? "s" : ""}</span></div>
           <div class="meta">${new Date(last).toLocaleDateString()} ${famBadge}</div>
         </div>
         <div class="row-actions">
@@ -3457,7 +3508,7 @@ function renderCodeList() {
         const exPlaying = playback && playback.key === exKey;
         html += `
           <li class="example-row">
-            <span class="ex-name">Example ${i + 1}<span class="ex-date">${new Date(t.createdAt).toLocaleDateString()}</span></span>
+            <span class="ex-name">Take ${i + 1}<span class="ex-date">${new Date(t.createdAt).toLocaleDateString()}</span></span>
             <span class="row-actions">
               <button class="btn tiny ${exPlaying ? "playing" : ""}" data-act="play-ex" data-id="${t.id}">${exPlaying ? "Stop" : "Play"}</button>
               <button class="btn tiny danger" data-act="del-ex" data-id="${t.id}">Delete</button>
@@ -3495,8 +3546,8 @@ function renderPerformable() {
   }
   if (words.length === 0) {
     const note = templates.length === 0
-      ? "No codes yet."
-      : `No codes for this algorithm. Yours were taught with ${[...otherFams].map((f) => FAM_LABEL[f] || f).join(", ")} — switch back in the algorithm picker, or teach new ones here.`;
+      ? "No moves yet."
+      : `No moves for this algorithm. Yours were taught with ${[...otherFams].map((f) => FAM_LABEL[f] || f).join(", ")}; moves only match the algorithm they were taught with.`;
     performListEl.innerHTML = `<span class="muted">${escapeHtml(note)}</span> <button class="btn tiny" data-goteach="1">Go to Teach</button>`;
     return;
   }
@@ -3515,7 +3566,7 @@ performListEl.addEventListener("click", (e) => {
   else startPlayback(word);
 });
 
-codeList.addEventListener("click", (e) => {
+codeList.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-act]");
   if (!btn) return;
   const act = btn.dataset.act;
@@ -3533,7 +3584,7 @@ codeList.addEventListener("click", (e) => {
     else startPlaybackExample(id);
   } else if (act === "del") {
     stopPlayback();
-    if (!confirm(`Delete “${word}” and all its examples?`)) return;
+    if (!(await paperConfirm(`Delete “${word}” and all its takes?`))) return;
     templates = templates.filter((t) => !matches(t));
     saveTemplates();
     renderCodeList();
@@ -3541,13 +3592,18 @@ codeList.addEventListener("click", (e) => {
     const t = templates.find((x) => x.id === id);
     if (!t) return;
     const n = templates.filter((x) => x.word.toLowerCase() === t.word.toLowerCase()).length;
-    if (!confirm(n > 1 ? `Delete this example of “${t.word}”?` : `Delete “${t.word}”? It has only this example.`)) return;
+    if (!(await paperConfirm(n > 1 ? `Delete this take of “${t.word}”?` : `Delete “${t.word}”? It has only this take.`))) return;
     stopPlayback();
     templates = templates.filter((x) => x.id !== id);
     saveTemplates();
     renderCodeList();
   } else if (act === "rename") {
-    const name = prompt("New word or phrase:", word);
+    const name = await paperDialog({
+      message: "New word or phrase:",
+      confirmLabel: "Rename",
+      cancelLabel: "Cancel",
+      input: word,
+    });
     if (name && name.trim()) {
       const nn = name.trim();
       for (const t of templates) if (matches(t)) t.word = nn;
@@ -3599,15 +3655,21 @@ importFile.addEventListener("change", async () => {
     }
     saveTemplates();
     renderCodeList();
-    let msg = `Imported ${added} code(s).`;
+    let msg = `Imported ${added} move(s).`;
     if (skipped) msg += ` Skipped ${skipped} duplicate(s).`;
     if (invalid) msg += ` Ignored ${invalid} invalid entr${invalid === 1 ? "y" : "ies"}.`;
-    alert(msg);
-  } catch { alert("Could not read that file."); }
+    setCodesMsg(msg, "ok");
+  } catch { setCodesMsg("Could not read that file.", "warn"); }
   importFile.value = "";
 });
-clearAllBtn.addEventListener("click", () => {
-  if (!confirm("Delete all saved codes? A backup file downloads first, so you can Import it if you change your mind.")) return;
+const codesMsg = document.getElementById("codesMsg");
+function setCodesMsg(msg, cls) {
+  if (!codesMsg) return;
+  codesMsg.textContent = msg;
+  codesMsg.className = "teach-msg " + (cls || "muted");
+}
+clearAllBtn.addEventListener("click", async () => {
+  if (!(await paperConfirm("Delete every saved move? A backup file downloads first, so Import can undo it."))) return;
   // Safety net: the wipe always leaves a file behind.
   if (templates.length) exportCodes("algodance-codes-backup.json");
   templates = [];
@@ -3777,12 +3839,19 @@ function setKiosk(on) {
     document.exitFullscreen?.().catch(() => {});
   }
 }
-kioskBtn.addEventListener("click", () => setKiosk(true));
-bgBtn.addEventListener("click", startBgCapture);
-kioskExit.addEventListener("click", () => setKiosk(false));
+// Both live on the back of the sheet now; each closes it on the way out.
+// Calibration collects frames on the Perform tab, so it goes there first.
+kioskBtn.addEventListener("click", () => { closeBackBoard(); setKiosk(true); });
+bgBtn.addEventListener("click", () => {
+  closeBackBoard();
+  activateTab(document.getElementById("tab-perform"));
+  startBgCapture();
+});
+kioskExit.addEventListener("click", () => { stopAttract(); setKiosk(false); });
 document.addEventListener("fullscreenchange", () => {
   // Esc leaves browser fullscreen; drop the kiosk chrome with it.
   if (!document.fullscreenElement && document.body.classList.contains("kiosk")) {
+    stopAttract();
     document.body.classList.remove("kiosk");
     kioskExit.hidden = true;
   }
@@ -3868,6 +3937,10 @@ function activateTab(tab, focus = false) {
     if (templates.some((t) => (t.family || "blaze") === currentFamily)) warmupOffer.hidden = false;
   }
   if (name !== "perform") warmupOffer.hidden = true;
+  // The opening tab belongs to the attract ghost (the mimetic first lesson);
+  // any other tab hands the stage back to the visitor.
+  if (name === "howto") { if (ready && !tut) startAttract(); }
+  else stopAttract();
   if (ready) setPerformState();
   if (focus) tab.focus();
 }
@@ -3898,9 +3971,9 @@ const tutNextBtn = document.getElementById("tutNext");
 const tutExitBtn = document.getElementById("tutExit");
 const TUT_STEPS = [
   { phase: "Teach", tab: "teach", on: "tracked",
-    text: "First, the camera needs to see you. Step back until glowing dots appear on your head, shoulders and hands." },
+    text: "First, the camera needs to see you. Step back until ink discs are printed on your head, shoulders and hands." },
   { phase: "Teach", tab: "teach", on: null, demo: true,
-    text: "The dictionary already holds one move, called AlgoDance: the white ghost is dancing it now. Both arms sweep up overhead and back down, in four counts. Dance along! You'll teach your own move the same way." },
+    text: "The dictionary already holds one move, called AlgoDance: the printed ghost is dancing it now. Both arms sweep up overhead and back down, in four counts. Dance along! You'll teach your own move the same way." },
   { phase: "Teach", tab: "teach", on: "word",
     text: "Decide what your move will say: hello, yes, I love you. Type it in the Word or phrase box in the panel." },
   // One card for the whole recording, read BEFORE it starts: a card switch
@@ -3917,6 +3990,8 @@ const TUT_STEPS = [
 let tut = null;             // {i, shownAt} while the guided tutorial is running
 let tutTrackTimer = null;   // poller for the "can it see you" step
 let tutAdvanceTimer = null; // pending auto-advance, held back for reading time
+let tutUnlockTimer = null;  // pressure valve on a locked step
+const tutLockEl = document.getElementById("tutLock");
 // A step the visitor completes instantly (already standing in view, word
 // already typed) must still stay on screen long enough to be read before it
 // auto-advances; Next skips the wait.
@@ -3943,22 +4018,48 @@ function tutShow() {
   tutStepLabel.textContent = `Guide: step ${tut.i + 1} of ${TUT_STEPS.length} (${s.phase})`;
   tutText.textContent = s.text;
   tutNextBtn.textContent = tut.i === TUT_STEPS.length - 1 ? "Finish" : "Next";
-  // A locked step cannot be skipped: it advances only when the thing itself
-  // happens (saving the move with the LEFT hand over the face).
-  tutNextBtn.disabled = !!s.lock;
-  tutNextBtn.title = s.lock ? s.lockHint || "" : "";
+  // A locked step advances when the thing itself happens (saving the move
+  // with the LEFT hand over the face). The lock's reason is WRITTEN on the
+  // card, never a title tooltip a touchscreen would swallow, and a pressure
+  // valve unlocks Next after 45s or two failed takes, so bad lighting or a
+  // hat can never strand a first-timer here.
+  const locked = !!s.lock && !tut.unlocked;
+  tutNextBtn.disabled = locked;
+  tutLockEl.hidden = !s.lock;
+  if (s.lock) tutLockEl.textContent = tut.unlocked ? TUT_UNLOCK_HINT : s.lockHint || "";
+  clearTimeout(tutUnlockTimer);
+  if (locked) tutUnlockTimer = setTimeout(tutUnlock, 45000);
   tutBackBtn.disabled = tut.i === 0;
   tutCard.hidden = false;
+}
+const TUT_UNLOCK_HINT = "Having trouble? Click Next to move on, or use \"Record with a button instead\" in the Teach panel; it skips the face trigger.";
+function tutUnlock() {
+  if (!tut || !TUT_STEPS[tut.i].lock || tut.unlocked) return;
+  tut.unlocked = true;
+  tutNextBtn.disabled = false;
+  tutLockEl.hidden = false;
+  tutLockEl.textContent = TUT_UNLOCK_HINT;
+}
+// A failed save (too short, too little movement) on a locked step counts
+// toward the pressure valve: two strikes open the way out.
+function tutCaptureFailed() {
+  if (!tut || !TUT_STEPS[tut.i].lock || tut.unlocked) return;
+  tut.failed = (tut.failed || 0) + 1;
+  if (tut.failed >= 2) tutUnlock();
 }
 function tutAdvance() {
   if (!tut) return;
   if (tut.i >= TUT_STEPS.length - 1) { endTutorial(); return; }
   tut.i++;
+  tut.unlocked = false;
+  tut.failed = 0;
   tutShow();
 }
 function tutBack() {
   if (!tut || tut.i === 0) return;
   tut.i--;
+  tut.unlocked = false;
+  tut.failed = 0;
   tutShow();
 }
 function endTutorial() {
@@ -3969,6 +4070,8 @@ function endTutorial() {
   tutTrackTimer = null;
   clearTimeout(tutAdvanceTimer);
   tutAdvanceTimer = null;
+  clearTimeout(tutUnlockTimer);
+  tutUnlockTimer = null;
 }
 function tutNotify(ev) {
   if (!tut || TUT_STEPS[tut.i].on !== ev) return;
@@ -3983,6 +4086,7 @@ function tutNotify(ev) {
   }, TUT_MIN_READ_MS - waited);
 }
 function startTutorial() {
+  stopAttract();           // the guide brings its own demo ghost
   introHint.hidden = true; // one post-it at a time
   warmupOffered = true;    // the guide replaces the Perform warm-up offer
   tut = { i: 0 };
@@ -4024,6 +4128,34 @@ triggerModeSel.addEventListener("change", () => {
   manualCapturing = false;
   moving = false;
   setPerformState();
+  syncManualHint();
+});
+
+// The accessibility fallback used to live only in Perform > Tuning, a
+// different tab from where it is first needed. This button, on the Teach
+// panel itself, flips the same trigger setting.
+const manualHintBtn = document.getElementById("manualHintBtn");
+function syncManualHint() {
+  if (!manualHintBtn) return;
+  manualHintBtn.textContent = triggerMode === "manual"
+    ? "Switch back to the hands-on-face trigger"
+    : "Can't use the face trigger? Record with a button instead";
+}
+manualHintBtn?.addEventListener("click", () => {
+  triggerModeSel.value = triggerMode === "manual" ? "auto" : "manual";
+  triggerModeSel.dispatchEvent(new Event("change"));
+  setTeachMsg(triggerMode === "manual"
+    ? "Button recording is on: Record movement starts, Stop and save ends. No face cover needed."
+    : "The face trigger is back on: RIGHT hand starts, LEFT hand saves.", "ok");
+});
+
+// A lock screen or app switch mid-recording leaves a stale REC behind on
+// return. Cancel cleanly and say what happened instead.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && teach && teach.state === "capturing") {
+    cancelTeach();
+    setTeachMsg("Recording stopped because the screen was interrupted. Press Record movement to try again.", "warn");
+  }
 });
 soundToggle.addEventListener("change", () => { soundOn = soundToggle.checked; });
 
@@ -4051,7 +4183,24 @@ speakPhraseBtn.addEventListener("click", () => {
   const wasOn = speakOn; speakOn = true; speak(phrase.join(", ")); speakOn = wasOn;
 });
 undoWordBtn.addEventListener("click", () => { phrase.pop(); renderPhrase(); });
-modelSel.addEventListener("change", () => switchAlgo(modelSel.value));
+// Switching algorithm FAMILY silently unmatched every move taught under the
+// other family: in an unattended installation that is vandalism by accident.
+// The consequence is named at the moment of the switch.
+modelSel.addEventListener("change", async () => {
+  const next = modelSel.value;
+  const nextFam = ALGOS[next]?.family;
+  const affected = nextFam && nextFam !== currentFamily
+    && templates.some((t) => (t.family || "blaze") === currentFamily);
+  if (affected) {
+    const ok = await paperDialog({
+      message: `Moves taught with ${FAM_LABEL[currentFamily]} stop matching under ${FAM_LABEL[nextFam]} until you switch back. Switch anyway?`,
+      confirmLabel: "Switch",
+      cancelLabel: "Stay",
+    });
+    if (!ok) { modelSel.value = algoChoice; return; }
+  }
+  switchAlgo(next);
+});
 
 // Hold-to-capture: pointer (mouse/touch)
 holdBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); startManual(); });
@@ -4071,6 +4220,294 @@ window.addEventListener("keyup", (e) => {
   if (e.code === "Space" && triggerMode === "manual") { e.preventDefault(); stopManual(); }
 });
 
+// ---------- In-world dialogs ----------
+// confirm() and prompt() are browser chrome: a raw modal from outside the
+// collage, and the only surfaces in the app that were not paper. These ask
+// the same questions on a scrap of the app's own stock.
+const pdEl = document.getElementById("paperDialog");
+const pdMsg = document.getElementById("pdMsg");
+const pdInput = document.getElementById("pdInput");
+const pdOk = document.getElementById("pdOk");
+const pdCancel = document.getElementById("pdCancel");
+let pdResolve = null;
+function paperDialog({ message, confirmLabel = "OK", cancelLabel = "Cancel", input = null }) {
+  return new Promise((resolve) => {
+    if (pdResolve) pdResolve(pdInput.hidden ? false : null); // a second ask replaces the first
+    pdResolve = resolve;
+    pdMsg.textContent = message;
+    pdOk.textContent = confirmLabel;
+    pdCancel.textContent = cancelLabel;
+    pdInput.hidden = input == null;
+    if (input != null) pdInput.value = input;
+    pdEl.hidden = false;
+    if (input != null) { pdInput.focus(); pdInput.select(); } else pdOk.focus();
+  });
+}
+function pdClose(val) {
+  pdEl.hidden = true;
+  const r = pdResolve;
+  pdResolve = null;
+  if (r) r(val);
+}
+pdOk.addEventListener("click", () => pdClose(pdInput.hidden ? true : pdInput.value));
+pdCancel.addEventListener("click", () => pdClose(pdInput.hidden ? false : null));
+pdEl.addEventListener("click", (e) => { if (e.target === pdEl) pdClose(pdInput.hidden ? false : null); });
+window.addEventListener("keydown", (e) => {
+  if (pdEl.hidden) return;
+  if (e.key === "Escape") { e.preventDefault(); pdClose(pdInput.hidden ? false : null); }
+  else if (e.key === "Enter" && !pdInput.hidden) { e.preventDefault(); pdClose(pdInput.value); }
+});
+function paperConfirm(message, confirmLabel = "Delete") {
+  return paperDialog({ message, confirmLabel, cancelLabel: "Keep" });
+}
+
+// ---------- The back of the sheet (operator side) ----------
+// A paste-up has a front (the work) and a back (the pencil notes). Everything
+// that can reconfigure or wipe the installation lives on the back, reached by
+// holding the registration mark for ~2s (the wordmark on phones, where the
+// crop marks are hidden) or Shift+O, so a curious visitor never finds a
+// destructive control by accident.
+const backBoard = document.getElementById("backBoard");
+const backCloseBtn = document.getElementById("backClose");
+function openBackBoard() {
+  backBoard.hidden = false;
+  backCloseBtn.focus();
+}
+function closeBackBoard() { backBoard.hidden = true; }
+backCloseBtn.addEventListener("click", closeBackBoard);
+backBoard.addEventListener("click", (e) => { if (e.target === backBoard) closeBackBoard(); });
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !backBoard.hidden) { closeBackBoard(); return; }
+  if (e.shiftKey && (e.key === "O" || e.key === "o")) {
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea") return;
+    e.preventDefault();
+    if (backBoard.hidden) openBackBoard(); else closeBackBoard();
+  }
+});
+function bindLongPress(el, ms, fn) {
+  if (!el) return;
+  let timer = null;
+  const clear = () => { clearTimeout(timer); timer = null; };
+  el.addEventListener("pointerdown", () => {
+    clear();
+    timer = setTimeout(() => { clear(); fn(); }, ms);
+  });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) el.addEventListener(ev, clear);
+  el.addEventListener("contextmenu", (e) => { if (timer) e.preventDefault(); });
+}
+bindLongPress(document.querySelector(".mm-marks .reg"), 1600, openBackBoard);
+bindLongPress(document.querySelector(".logo"), 1600, openBackBoard);
+
+// ---------- The word wall ----------
+// Every word the installation has ever spoken is taped to the tile wall and
+// stays there: the accumulating artwork. One scrap per distinct word; saying
+// it again makes the scrap grow, so the wall records what gets said most.
+// Placement is chosen once and persisted, so the wall is stable across days.
+const WALL_KEY = "algodance.wall.v1";
+const wallEl = document.getElementById("wordWall");
+let wall = [];
+try { wall = JSON.parse(localStorage.getItem(WALL_KEY)) || []; } catch { wall = []; }
+function saveWall() {
+  try { localStorage.setItem(WALL_KEY, JSON.stringify(wall)); } catch {}
+}
+function wallFontSize(count) {
+  return Math.min(60, 19 + Math.round(Math.log2(count + 1) * 9));
+}
+function renderWall() {
+  if (!wallEl) return;
+  wallEl.innerHTML = "";
+  for (const e of wall) {
+    const s = document.createElement("span");
+    s.className = "wall-word" + (e.yel ? " y" : "");
+    s.textContent = e.word;
+    s.style.left = e.x + "%";
+    s.style.top = e.y + "%";
+    s.style.fontSize = wallFontSize(e.count) + "px";
+    s.style.setProperty("--wr", e.rot + "deg");
+    wallEl.appendChild(s);
+  }
+}
+function addToWall(word) {
+  const k = word.toLowerCase();
+  const e = wall.find((w) => w.word.toLowerCase() === k);
+  if (e) {
+    e.count++;
+  } else {
+    wall.push({
+      word,
+      count: 1,
+      x: +(2 + Math.random() * 88).toFixed(1),
+      y: +(2 + Math.random() * 90).toFixed(1),
+      rot: +(Math.random() * 9 - 4.5).toFixed(1),
+      yel: Math.random() < 0.3 ? 1 : 0,
+      at: Date.now(),
+    });
+    if (wall.length > 240) wall.shift();
+  }
+  saveWall();
+  renderWall();
+}
+document.getElementById("wallClear")?.addEventListener("click", async () => {
+  if (!(await paperConfirm("Clear the word wall? The moves themselves stay.", "Clear"))) return;
+  wall = [];
+  saveWall();
+  renderWall();
+});
+
+// ---------- Attract: the ghost runs the room ----------
+// The first lesson is mimetic. On the opening tab, and on an idle kiosk, the
+// seed ghost loops with a taped caption, and copying it well enough fires the
+// word: a visitor's first exchange with the piece is danced, not read.
+const attractNote = document.getElementById("attractNote");
+let attractArmed = false;
+let attractIdleCycles = 0; // kiosk: cycles danced through without a match
+let attractNoteTimer = null;
+let lastActivityAt = 0;
+const KIOSK_IDLE_MS = 45000;
+
+function attractItems() {
+  const its = templates.filter((t) => t.word.toLowerCase() === "algodance"
+    && (t.family || "blaze") === currentFamily);
+  return its.length ? its : [algoDanceSeed()];
+}
+function startAttract() {
+  if (attractArmed || teach || playback || !ready) return;
+  const items = attractItems();
+  startPlaybackItems(playbackReps(items), "AlgoDance", "attract");
+  if (!playback) return;
+  pbLoop = true;
+  playback.allItems = items;
+  playback.capture = [];
+  attractArmed = true;
+  attractIdleCycles = 0;
+  clearTimeout(attractNoteTimer);
+  attractNote.hidden = false;
+  attractNote.innerHTML = 'Dance along. This move says <b>ALGODANCE</b>.';
+}
+function stopAttract() {
+  if (!attractArmed) return;
+  attractArmed = false;
+  clearTimeout(attractNoteTimer);
+  attractNote.hidden = true;
+  if (playback?.key === "attract") stopPlayback();
+}
+// One ghost cycle ended: score whatever the visitor danced alongside it.
+function attractCycleEnd(now) {
+  const pb = playback;
+  if (!pb) return;
+  const frames = trimStillEnds(pb.capture || []);
+  pb.capture = [];
+  if (frames.length < MIN_SEG_FRAMES * 2) return; // nobody dancing; keep looping
+  const live = resampleSeq(frames, FIXED_LEN);
+  let best = Infinity;
+  for (const t of pb.allItems) best = Math.min(best, dtw(live, t.seq));
+  // Lenient on purpose: a first hello should land, and the word is
+  // unambiguous because only the seed is being offered.
+  if (best < thresholdFor("AlgoDance") * 1.3) {
+    stopAttract();
+    fireWord("AlgoDance", now);
+    attractNote.hidden = false;
+    attractNote.innerHTML = "That is the whole idea. Now teach it <b>your</b> move.";
+    attractNoteTimer = setTimeout(() => { attractNote.hidden = true; }, 6000);
+  } else if (document.body.classList.contains("kiosk") && ++attractIdleCycles >= 2) {
+    // Someone is moving to their own plan; get out of their way.
+    stopAttract();
+    lastActivityAt = performance.now();
+  }
+}
+// An idle kiosk invites instead of mirroring: after a quiet spell the seed
+// ghost takes the room, and any match or touch hands it back.
+setInterval(() => {
+  if (!document.body.classList.contains("kiosk")) return;
+  if (!ready || teach || playback || bgCapture || attractArmed) return;
+  if (performance.now() - Math.max(lastActivityAt, lastFireAt) > KIOSK_IDLE_MS) startAttract();
+}, 5000);
+window.addEventListener("pointerdown", () => { lastActivityAt = performance.now(); });
+
+// ---------- Hands-only word picking ----------
+// On the idle Teach tab, the dictionary's words hang along the video's edge
+// as paper scraps; holding a wrist over one for a moment picks it. With the
+// hands-free re-arm (right hand on face), a whole take can then be taught
+// without touching the keyboard once.
+const PICK_DWELL_MS = 1200;
+const PICK_R = 0.085; // hit radius around a scrap, image-normalized
+const PICK_X = 0.09;  // column position; mirrored to the viewer's right edge
+let pick = { word: null, since: 0 };
+function pickerWords() {
+  const seen = new Set();
+  const out = [];
+  for (let i = templates.length - 1; i >= 0 && out.length < 6; i--) {
+    const t = templates[i];
+    if ((t.family || "blaze") !== currentFamily) continue;
+    const k = t.word.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); out.push(t.word); }
+  }
+  return out;
+}
+function drawWordPicker(lms, now) {
+  if (playback || teach) return;
+  const words = pickerWords();
+  if (!words.length) return;
+  const W = overlay.width, H = overlay.height;
+  const wrists = [lms[15], lms[16]].filter((p) => p && (p.visibility ?? 0) > 0.3);
+  let hovered = null;
+  octx.save();
+  octx.textBaseline = "middle";
+  octx.textAlign = "center";
+  words.forEach((word, i) => {
+    const cx = PICK_X;
+    const cy = 0.2 + i * 0.12;
+    let d = 1;
+    for (const p of wrists) d = Math.min(d, Math.hypot(p.x - cx, p.y - cy));
+    const near = d < PICK_R;
+    if (near && !hovered) hovered = word;
+    const label = word.length > 14 ? word.slice(0, 13) + "…" : word;
+    octx.font = `700 ${Math.max(11, Math.round(H * 0.028))}px "Courier Prime", monospace`;
+    const tw = octx.measureText(label).width;
+    const px = cx * W, py = cy * H;
+    const padX = 10, bh = Math.max(24, H * 0.052);
+    // The scrap. The canvas is CSS-mirrored, so the rect draws plain and only
+    // the text is locally flipped, like every other letter on this overlay.
+    octx.fillStyle = near ? "#ECFF00" : "rgba(244,238,224,.92)";
+    octx.strokeStyle = "rgba(28,24,21,.92)";
+    octx.lineWidth = 2;
+    octx.fillRect(px - tw / 2 - padX, py - bh / 2, tw + padX * 2, bh);
+    octx.strokeRect(px - tw / 2 - padX, py - bh / 2, tw + padX * 2, bh);
+    octx.save();
+    octx.translate(px, py + 1);
+    octx.scale(-1, 1);
+    octx.fillStyle = "#1C1815";
+    octx.fillText(label, 0, 0);
+    octx.restore();
+    if (near && pick.word === word) {
+      // Dwell progress: a red arc filling beside the scrap.
+      const prog = Math.min(1, (now - pick.since) / PICK_DWELL_MS);
+      octx.beginPath();
+      octx.strokeStyle = "#FF002A";
+      octx.lineWidth = 4;
+      octx.arc(px - tw / 2 - padX - 14, py, 9, -Math.PI / 2, -Math.PI / 2 + prog * TAU);
+      octx.stroke();
+    }
+  });
+  octx.restore();
+  if (hovered) {
+    if (pick.word !== hovered) {
+      pick.word = hovered;
+      pick.since = now;
+    } else if (now - pick.since >= PICK_DWELL_MS) {
+      pick.word = null;
+      wordInput.value = hovered;
+      rearmWord = hovered.toLowerCase(); // the face-cover now starts the take, hands-free
+      rearmSince = 0;
+      setTeachMsg(`Picked “${hovered}”. Cover your face with your RIGHT hand to record a take, no click needed.`, "ok");
+      tutNotify("word");
+    }
+  } else {
+    pick.word = null;
+  }
+}
+
 // ---------- Helpers ----------
 function setTeachMsg(msg, cls) { teachMsg.textContent = msg; teachMsg.className = "teach-msg " + (cls || "muted"); }
 function escapeHtml(s) {
@@ -4087,14 +4524,16 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v63 (2026-08-06)");
+  console.log("AlgoDance build v76 (2026-10-01)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();
   threshVal.textContent = threshInput.value;
   modelSel.value = algoChoice;
+  syncManualHint();
   renderCodeList();
   renderPhrase();
+  renderWall();
   if (!localStorage.getItem(INTRO_KEY)) introHint.hidden = false;
 
   // The pose engine is a ~15 MB first-time download (wasm + model). Kick it off
@@ -4116,6 +4555,8 @@ document.getElementById("introDismiss").addEventListener("click", () => {
     clearTimeout(slow);
     statusEl.textContent = "Ready.";
     setPerformState();
+    // The first thing a visitor meets is the seed ghost, not a paragraph.
+    if (currentTab === "howto" && !tut) startAttract();
   } catch (err) {
     clearTimeout(slow);
     console.error(err);

@@ -160,11 +160,82 @@ JSON file is supported for backup and manual sharing today.
 
 ## UI / theme
 
-- Five tabs: **Teach**, **Perform**, **Codes**, **About**, **Zine**.
+- Six tabs: **How it works** (default), **Teach**, **Perform**, **Codes**,
+  **About**, **Zine**.
 - Big webcam stage with skeleton overlay (mirrored, selfie-style); matched word
   animates large over the video; a phrase strip collects matched words.
 - Perform shows only its core (your codes, the match meter, the phrase);
   routine building and tuning sit behind disclosures.
+- **Instructions are stamped, not typed:** the teach/perform loop is a strip of
+  one-imperative scraps (`.stamp-steps`), with prose demoted to "fine print"
+  disclosures. The critical R-then-L instruction lives in exactly one voice.
+- **Terminology:** a *move* says a *word or phrase*; repeated recordings of the
+  same word are *takes*. "Example"/"template" never appear in UI copy.
+
+### The mimetic first lesson / attract loop
+
+The first thing a visitor meets is the seed ghost, not a paragraph: on the
+opening tab (and on a kiosk idle for 45 s) the AlgoDance ghost loops with a
+taped caption ("Dance along. This move says ALGODANCE"). Each ghost cycle
+scores whatever the visitor danced alongside it (lenient threshold, the word is
+unambiguous), and a good copy fires the word: the first exchange with the
+piece is danced. On a kiosk, two cycles of a body dancing without matching
+hands the room back to normal matching, so the loop never traps a performer.
+
+### Rejection is never silent
+
+A completed move that matches nothing gets a quiet paper scrap near the figure
+("Saw that. Nothing matched yet; make your move bigger"), rate-limited to one
+per 4 s. The same element carries the closest-match coaching; both render in
+kiosk mode, where the match meter does not exist. Silence reading as "it can't
+see me" is the top abandonment driver for gesture installations.
+
+### The back of the sheet (operator side)
+
+Paste-ups have a front (the work) and a back (the pencil notes). Everything
+that can reconfigure or wipe the installation lives on the back: pose
+algorithm, layout rotation, background cutout, idle calibration, kiosk entry,
+delete-all, and the word-wall clear. It opens by holding the registration mark
+in the corner for ~2 s (the wordmark on phones, where the crop marks are
+hidden), or Shift+O. Switching algorithm family asks an in-world confirm that
+names the consequence (the other family's moves stop matching). The browser's
+`confirm()`/`prompt()` are never used; a paper-dialog scrap asks instead.
+
+### The word wall
+
+Every word the installation has ever spoken is taped to the tile wall, UNDER
+the paper surfaces (z-index 0), so language peeks out of the gutters and the
+wall slowly disappears beneath it. One scrap per distinct word, placed once
+and persisted (`algodance.wall.v1`); saying a word again grows its scrap
+(log-scaled, capped), so the wall records what the room says most. Hidden on
+phones and in kiosk, where the video owns the screen.
+
+### Hands-only word picking
+
+On the idle Teach tab the dictionary's recent words hang along the video edge
+as scraps; holding a wrist over one for ~1.2 s picks it into the word field and
+arms the hands-free re-arm, so a whole take can be taught without touching the
+keyboard. **Privacy constraint: the browser's built-in speech recognition (Web
+Speech API) must never be used for word entry; in Chrome it ships audio to
+Google's servers, which breaks the app's core claim. On-device WASM speech
+(Vosk/Whisper) is acceptable future work.**
+
+### Accessibility floor (verified)
+
+- Red as *text* on paper uses `--accent-2` `#D40021` (4.75:1) or `#B3001B` on
+  the post-it; the bright `--accent` red is reserved for fills, edges, and
+  second passes. Muted text on the darker paper uses `--ink-soft-2` `#4E463A`
+  (5.4:1 on paper-3).
+- Buttons have a 40 px touch floor (36 px small, 30 px tiny, 28 px chip-x);
+  tabs 38 px.
+- Nothing glows: the REC dot and the current count dot print with off-register
+  second passes, and the former glassy pills (playback controls, zine chrome,
+  kiosk exit, kiosk phrase chips, closest-match hint) are paper scraps.
+- The locked guide step states its reason on the card (never a tooltip) and
+  unlocks Next after 45 s or two failed takes; the manual-trigger fallback is
+  reachable from the Teach panel itself ("Record with a button instead").
+- A recording interrupted by a lock screen cancels with a plain explanation
+  instead of resurfacing as a stale REC.
 
 ### Look: mixed media on a tiled wall
 
@@ -253,6 +324,12 @@ full-screen performance view, and per-code thresholds.
   (reprojected from stored coordinates, no video involved)
 - [x] Full-screen performance/installation view (kiosk mode)
 - [x] Mixed-media visual world; optional background cutout
-- [ ] Optional text-to-speech output per word
+- [x] Operator "back of the sheet" (hidden settings surface; model-switch guard)
+- [x] Mimetic first lesson + kiosk attract loop (copy the seed ghost)
+- [x] Persistent word wall (everything the installation has said)
+- [x] Visible rejection feedback (miss scraps, also in kiosk)
+- [x] Hands-only word picking (dwell over a word scrap)
+- [x] Stamped instruction strips; in-world dialogs replace confirm()/prompt()
+- [ ] On-device (WASM) speech-to-text for word entry; never the Web Speech API
 - [ ] Per-code threshold
 - [ ] Shared code library (see [SHARING.md](SHARING.md))
