@@ -134,7 +134,9 @@ let rearmSince = 0;
 let warmupOffered = false;    // the Perform warm-up offer shows once per session
 // Teach-on-a-beat tempo, persisted.
 const BPM_KEY = "algodance.bpm.v1";
-const DEFAULT_BPM = 107;
+// 80 sits at the easy end of social-dance tempo: slow enough to learn a move
+// from, still musical. Faster dancers can raise it per teach.
+const DEFAULT_BPM = 80;
 function teachBpm() {
   const v = parseInt(bpmInput?.value, 10);
   return isFinite(v) ? Math.min(160, Math.max(60, v)) : DEFAULT_BPM;
@@ -4538,7 +4540,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v77 (2026-10-01)");
+  console.log("AlgoDance build v78 (2026-10-01)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();
