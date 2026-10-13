@@ -542,7 +542,24 @@ function migrateSq(t) {
   return t;
 }
 function saveTemplates() {
-  localStorage.setItem(STORE_KEY, JSON.stringify(templates));
+  // Quantize stored coordinates to 4 decimals. Matching tolerances live around
+  // 0.1 torso units, but full doubles made each take ~25 KB of JSON, and an
+  // installation's months of taught codes can walk that into localStorage's
+  // ~5 MB cap. Rounding is idempotent, so re-rounding on every save is free.
+  for (const t of templates) {
+    if (!Array.isArray(t.seq)) continue;
+    for (const f of t.seq) for (let i = 0; i < f.length; i++) f[i] = Math.round(f[i] * 1e4) / 1e4;
+  }
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(templates));
+  } catch (e) {
+    // Quota exceeded (or private mode): the code still works this session, but
+    // it will not survive a reload. Losing that silently is worse than saying
+    // it, and an aborted save must never abort the caller's UI flow.
+    console.error("saving codes failed:", e);
+    const msg = "Could not save to browser storage (it may be full). This move works until the page reloads; export your codes as a file, then delete some to free space.";
+    try { setTeachMsg(msg, "warn"); setCodesMsg(msg, "warn"); } catch {}
+  }
   recomputeWordStats();
 }
 function newId() { return "c_" + Math.random().toString(36).slice(2, 9) + performance.now().toString(36); }
@@ -682,6 +699,23 @@ async function initCamera() {
   overlay.height = video.videoHeight;
   cutout.width = video.videoWidth;
   cutout.height = video.videoHeight;
+  // An unattended installation must survive the camera hiccuping (a USB
+  // glitch, an OS permission re-prompt, display sleep): a frozen last frame
+  // with nobody there to reload is a dead exhibit. When the track ends,
+  // keep retrying until the stream is back.
+  stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+    statusEl.textContent = "Camera stream lost. Reconnecting…";
+    const retry = async () => {
+      try {
+        await initCamera();
+        statusEl.textContent = "Ready.";
+        setPerformState();
+      } catch {
+        setTimeout(retry, 3000);
+      }
+    };
+    retry();
+  });
 }
 
 // Of the detected people, return the most prominent one: the nearest, which
@@ -2791,7 +2825,11 @@ function updateTeachUI(bodyVisible) {
   if (!lastHandVis) {
     countdownEl.hidden = false;
     countdownEl.textContent = "?";
-    statusEl.textContent = "Can't see your hands. Keep at least one hand in view; recording is paused.";
+    // Recording does NOT pause on lost hands (teachStep keeps every frame and
+    // only the hand-less ENDS are trimmed), so the warning must not claim it does.
+    statusEl.textContent = teach.state === "capturing"
+      ? "Can't see your hands. They carry the move; bring them back into the frame."
+      : "Can't see your hands. Keep at least one hand in view before you record.";
     return;
   }
   // The big overlay owns the countdown / REC states; keep the pill hidden.
@@ -3678,7 +3716,9 @@ function renderCodeList() {
     const count = g.items.length;
     const last = Math.max(...g.items.map((t) => t.createdAt));
     const fams = [...new Set(g.items.map((t) => t.family || "blaze"))];
-    const famBadge = fams.map((f) => `<span class="fam fam-${f}">${FAM_LABEL[f] || f}</span>`).join("");
+    // family can arrive from an imported file, so it is attacker-shaped text:
+    // escape it even though import also sanitizes, old stored data predates that.
+    const famBadge = fams.map((f) => `<span class="fam fam-${escapeHtml(f)}">${escapeHtml(FAM_LABEL[f] || f)}</span>`).join("");
     const wordKey = "word:" + g.word.toLowerCase();
     const wordPlaying = playback && playback.key === wordKey;
     const rehearsing = playback && playback.key === "rh:" + g.word.toLowerCase();
@@ -3856,8 +3896,15 @@ importFile.addEventListener("change", async () => {
     const seen = new Set(templates.map(codeSignature));
     let added = 0, skipped = 0, invalid = 0;
     for (const raw of incoming) {
-      const t = { ...raw, family: raw.family || "blaze" };
+      // family and word end up in rendered HTML and CSS class names, so a
+      // hostile file must not smuggle arbitrary strings through them: family
+      // is allowlisted to known-shaped slugs, the word capped to the same
+      // length the Teach input enforces.
+      const fam = typeof raw.family === "string" && /^[a-z][a-z0-9-]{0,19}$/.test(raw.family)
+        ? raw.family : "blaze";
+      const t = { ...raw, family: fam };
       if (!isValidTemplate(t)) { invalid++; continue; }
+      t.word = t.word.trim().slice(0, 60);
       const sig = codeSignature(t);
       if (seen.has(sig)) { skipped++; continue; }
       seen.add(sig);
@@ -4620,7 +4667,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v82 (2026-10-01)");
+  console.log("AlgoDance build v84 (2026-10-13)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();
