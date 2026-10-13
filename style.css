@@ -1642,8 +1642,9 @@ body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
   .stamp-steps .stamp,
   .back-sheet,
   .paper-dialog-card,
-  .word-wall .wall-word { transform: none; }
-  .attract-note { transform: translateX(-50%); }
+  /* right/top anchored: a translateX(-50%) left over from a centered layout
+     shoved the caption half its width off its corner for reduced-motion users. */
+  .attract-note { transform: none; }
 }
 
 /* Stacked full-width actions breathe apart instead of touching edges. */
