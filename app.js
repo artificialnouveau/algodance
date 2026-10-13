@@ -1711,6 +1711,7 @@ const MIN_MOVE_MS = 350;
 const MAX_MOVE_MS = 7000;
 const perfBuf = [];               // {vec, t}
 let moving = false, moveStart = 0, lastActive = 0;
+let liveScoreAt = 0;              // last in-progress feedback scan (throttled)
 let perfHandsLost = false;        // matching paused because no wrist is tracked
 let teachHandsLost = false;       // same warning, on the idle Teach tab
 let lastHandVis = true;           // debounced: are the hands usable, steadily
@@ -2070,8 +2071,15 @@ function performStep(vec, now, face, conf) {
     && travelOf(soFar) >= MIN_ACTIVE_TRAVEL
     && (!restPose || maxDevFrom(soFar, restPose) >= REST_DEV_MIN);
   if (looksReal && !holding) {
-    const inProgress = scoreSegment(soFar);
-    if (inProgress) showScore(inProgress);
+    // In-progress feedback costs a DTW against the whole dictionary, and at
+    // detection rate (~30/s) that was the biggest per-frame cost once the
+    // dictionary grows. The meter only needs to feel live, not frame-exact:
+    // 150ms cadence reads identically and caps the cost at ~7 scans/s.
+    if (now - liveScoreAt >= 150) {
+      liveScoreAt = now;
+      const inProgress = scoreSegment(soFar);
+      if (inProgress) showScore(inProgress);
+    }
   } else if (!holding) {
     setBar(0);
     hideClosest();
@@ -2207,6 +2215,24 @@ const AMBIG_GAP_FRAC = 0.25;  // second-best must be at least this much farther
 const CROSS_WORD_FRAC = 0.55; // a match may use at most this share of the gap to the nearest OTHER word
 const FIRE_MARGIN = 0.8;      // firing needs dist under this fraction of the threshold (display shows the full range)
 
+// Pairwise take-to-take DTW, cached by id pair. recomputeWordStats compares
+// every take against every other take and runs on EVERY save, so without the
+// cache each save recomputed the whole quadratic matrix and froze the main
+// thread for longer as the dictionary grew; a take's seq never changes after
+// it is saved, so only the new take's row is ever actually new. Deleted takes
+// leave stale entries behind, so the cache is simply dropped when it gets big.
+const dtwPairCache = new Map();
+function dtwBetween(a, b) {
+  const key = a.id < b.id ? a.id + "|" + b.id : b.id + "|" + a.id;
+  let d = dtwPairCache.get(key);
+  if (d == null) {
+    d = dtw(a.seq, b.seq);
+    if (dtwPairCache.size > 20000) dtwPairCache.clear();
+    dtwPairCache.set(key, d);
+  }
+  return d;
+}
+
 // Recompute per-word calibration: how consistent a word's own examples are
 // (auto threshold) AND how close it sits to every other word (cross cap).
 // Consistent examples give a tight threshold; a word that lives near another
@@ -2261,7 +2287,7 @@ function recomputeWordStats() {
       const dists = [];
       for (let i = 0; i < items.length; i++)
         for (let j = i + 1; j < items.length; j++)
-          dists.push(dtw(items[i].seq, items[j].seq));
+          dists.push(dtwBetween(items[i], items[j]));
       dists.sort((a, b) => a - b);
       const med = dists[Math.floor(dists.length / 2)];
       // A live performance sits farther from any example than examples sit
@@ -2277,7 +2303,7 @@ function recomputeWordStats() {
       if (k2 === k) continue;
       for (const a of items)
         for (const b of items2) {
-          const d = dtw(a.seq, b.seq);
+          const d = dtwBetween(a, b);
           if (d < cross) cross = d;
         }
     }
@@ -3454,7 +3480,8 @@ function drawPlayback(now) {
       pb.stepIdx++;
       if (pb.stepIdx >= pb.steps.length) {
         const hits = pb.scores.filter((s) => s.ok).length;
-        const avg = Math.round(pb.scores.reduce((s, r) => s + r.pct, 0) / pb.scores.length);
+        // A "too little movement" step carries no pct; it averages as 0, not NaN.
+        const avg = Math.round(pb.scores.reduce((s, r) => s + (r.pct || 0), 0) / pb.scores.length);
         pb.summary = `Routine done: ${hits}/${pb.scores.length} hits, average ${avg}%.`;
         flashBigStatus(`${hits}/${pb.scores.length} · ${avg}%`, hits === pb.scores.length ? "" : "stop", 2800);
         if (hits === pb.scores.length) flashRiso(now);
@@ -4667,7 +4694,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v84 (2026-10-13)");
+  console.log("AlgoDance build v85 (2026-10-13)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();
