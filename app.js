@@ -425,52 +425,11 @@ function traceFaceLines(ctx, u, v) {
   ctx.bezierCurveTo(-0.08 * u, 0.51 * v, 0.08 * u, 0.51 * v, 0.21 * u, 0.475 * v);
 }
 
-// Big R / L letters on the wrists during a teach: RIGHT hand starts the
-// recording, LEFT hand stops it. The hand whose turn it is glows yellow.
-// The overlay canvas is CSS-mirrored, so text must be drawn locally flipped
-// (scale(-1,1)) or the letters would read backwards.
-function drawHandLabel(w, letter, active) {
-  if (!w || (w.visibility ?? 0) < 0.3) return;
-  let x = w.x * overlay.width;
-  let y = w.y * overlay.height - 12;
-  // Keep the letter clear of the face: when the wrist is at or near it,
-  // push the label outside the face area, away from its centre, so it never
-  // covers the head mark the hand is aiming for.
-  if (restInfo) {
-    const ax = restInfo.anchor.x * overlay.width;
-    const ay = restInfo.anchor.y * overlay.height;
-    const rPx = REST_ENTER * restInfo.scale * overlay.width * 0.9;
-    const dx = x - ax, dy = y - ay;
-    const dist = Math.hypot(dx, dy);
-    const clear = rPx + 30;
-    if (dist < clear) {
-      const ux = dist > 1 ? dx / dist : (letter === "R" ? 1 : -1);
-      const uy = dist > 1 ? dy / dist : 0;
-      x = ax + ux * clear;
-      y = ay + uy * clear;
-    }
-  }
-  octx.save();
-  octx.translate(x, y);
-  octx.scale(-1, 1); // cancel the CSS mirror so the letter reads correctly
-  octx.font = `900 ${active ? 52 : 34}px system-ui, sans-serif`;
-  octx.textAlign = "center";
-  octx.textBaseline = "bottom";
-  octx.lineWidth = active ? 8 : 5;
-  octx.strokeStyle = "rgba(0,0,0,0.7)";
-  octx.strokeText(letter, 0, 0);
-  octx.fillStyle = active ? "#ECFF00" : "rgba(255,255,255,0.85)";
-  octx.fillText(letter, 0, 0);
-  octx.restore();
-}
-function drawHandLabels(lms) {
-  // Outside a teach (idle Teach tab) both letters show small and quiet, a
-  // reminder of which hand does what; during a teach the hand whose turn it
-  // is glows big and yellow.
-  const capturing = teach?.state === "capturing";
-  drawHandLabel(lms[16], "R", !!teach && !capturing); // subject's right hand: start
-  drawHandLabel(lms[15], "L", !!teach && capturing);  // subject's left hand: stop and save
-}
+// The R/L letters live ON the wrist discs (drawPresence); during a teach the
+// acting hand's disc wears a yellow turn ring there too. A second set of
+// floating letters used to be drawn here, and its collision-avoidance shoved
+// the letter toward the shoulder whenever the wrist neared the face, so every
+// hand appeared to carry two letters. One mark per hand, always.
 
 // Per-landmark weights for matching. All 33 points equally weighted let the
 // face and torso (which barely move) dilute the wrists and ankles (which carry
@@ -729,9 +688,17 @@ async function initCamera() {
 // reads as the largest skeleton (shoulder width + torso length), lightly
 // weighted by how confidently the shoulders are seen. This is what keeps a
 // bystander in the background from stealing the tracking.
+// Sticky across frames: the tracker sometimes emits TWO overlapping candidate
+// poses for the same person, and picking purely by size/visibility every frame
+// flip-flopped between them several times a second. Each flip was a
+// whole-skeleton jump that no downstream smoothing could hide (it looked like
+// violent jitter, or nodes suddenly landing far off the body). A pose near
+// last frame's choice keeps its score; a pose elsewhere is handicapped up to
+// 2x, so a background bystander must be CLEARLY bigger/nearer to steal the
+// tracking, while same-spot duplicates can no longer alternate.
+let lastMainMid = null; // mid-shoulder of the last chosen pose
 function pickMainPose(poses) {
-  if (!poses || poses.length === 0) return null;
-  if (poses.length === 1) return poses[0];
+  if (!poses || poses.length === 0) { lastMainMid = null; return null; }
   let best = null, bestScore = -Infinity;
   for (const p of poses) {
     const ls = p[11], rs = p[12], lh = p[23], rh = p[24];
@@ -742,10 +709,17 @@ function pickMainPose(poses) {
     const hy = ((lh?.y ?? shy) + (rh?.y ?? shy)) / 2;
     const torso = Math.hypot(shx - hx, shy - hy);
     const vis = ((ls.visibility ?? 0) + (rs.visibility ?? 0)) / 2;
-    const score = (shoulder + torso) * (0.5 + vis);
+    let score = (shoulder + torso) * (0.5 + vis);
+    if (lastMainMid && poses.length > 1) {
+      const d = Math.hypot(shx - lastMainMid.x, shy - lastMainMid.y);
+      score /= 1 + Math.min(1, 5 * d);
+    }
     if (score > bestScore) { bestScore = score; best = p; }
   }
-  return best || poses[0];
+  best = best || poses[0];
+  const bl = best[11], br = best[12];
+  lastMainMid = bl && br ? { x: (bl.x + br.x) / 2, y: (bl.y + br.y) / 2 } : null;
+  return best;
 }
 
 // Draw a skeleton (33-slot pose) with the given bone list. Replaces MediaPipe
@@ -988,6 +962,39 @@ function inkStamp(rgb) {
 }
 
 const trails = new Map(); // landmark index -> [{x, y, t}]
+// Which joints are currently drawn. A single visibility cutoff made marks
+// blink whenever a half-occluded landmark hovered at the threshold (worst
+// during the hand-over-face gesture), so showing and hiding use different
+// thresholds: harder to appear, harder to disappear.
+const nodeShown = new Set();
+// Last drawn position per joint MARK (the discs and the face egg; trails keep
+// the raw track). Each mark settles toward its landmark instead of sitting on
+// it: one extra visual low-pass that halves residual One-Euro jitter for a
+// frame of lag. A mark being deliberately HELD (face covered, wrist latched on
+// the face) uses a near-zero rate: the model's estimates under a covering palm
+// are garbage, but the head and the covering hand genuinely are not moving, so
+// the marks stay planted instead of sliding around under the hand.
+const markPos = new Map();
+function settleMark(i, tx, ty, rate, dead = 0) {
+  let m = markPos.get(i);
+  if (!m) { markPos.set(i, (m = { x: tx, y: ty })); return m; }
+  const dx = tx - m.x, dy = ty - m.y;
+  let k = rate;
+  if (dead > 0) {
+    // Dead-band: inside `dead` px the mark does not move AT ALL, and the pull
+    // ramps back to full rate over the next couple of px. A standing body
+    // shows planted marks instead of simmering ones; real movement clears the
+    // band in a single frame and feels no different.
+    const dist = Math.hypot(dx, dy);
+    k = rate * Math.min(1, Math.max(0, (dist - dead) / (dead * 2)));
+  }
+  m.x += dx * k;
+  m.y += dy * k;
+  return m;
+}
+// Torso scale smoothed across frames: it feeds every mark's radius, and its
+// frame-to-frame flutter made the discs breathe even when they stood still.
+let scSmooth = 0;
 function drawPresence(lms, now) {
   let sc = 0, P = null;
   if (lms) {
@@ -998,10 +1005,14 @@ function drawPresence(lms, now) {
       const hx = (((lh?.x ?? ls.x) + (rh?.x ?? rs.x)) / 2) * overlay.width;
       const hy = (((lh?.y ?? ls.y) + (rh?.y ?? rs.y)) / 2) * overlay.height;
       sc = Math.hypot(shx - hx, shy - hy);
+      if (sc > 0) scSmooth = scSmooth ? scSmooth + (sc - scSmooth) * 0.3 : sc;
     }
     P = (i) => {
       const p = lms[i];
-      return p && (p.visibility ?? 1) > 0.3
+      const v = p ? (p.visibility ?? 1) : 0;
+      const on = nodeShown.has(i) ? v > 0.22 : v > 0.38;
+      if (on) nodeShown.add(i); else nodeShown.delete(i);
+      return on
         ? { x: p.x * overlay.width, y: p.y * overlay.height }
         : null;
     };
@@ -1011,8 +1022,26 @@ function drawPresence(lms, now) {
   for (const d of TRAIL_DEFS) {
     let arr = trails.get(d.i);
     if (!arr) trails.set(d.i, (arr = []));
-    const p = P && sc > 8 ? P(d.i) : null;
-    if (p) arr.push({ x: p.x, y: p.y, t: now });
+    // A joint being held still by the hand-over-face pose records no trail:
+    // the estimates thrash under the covering palm, and the scribble they
+    // painted around the face was pure noise. The existing streak just fades.
+    const held =
+      (d.i === 0 && isNearFace()) ||
+      (d.i === 15 && handOnFace.left.on) ||
+      (d.i === 16 && handOnFace.right.on);
+    const p = !held && P && sc > 8 ? P(d.i) : null;
+    const last = arr[arr.length - 1];
+    // Losing the joint breaks the streak HERE, explicitly. The draw loop used
+    // to infer gaps from timestamps (points >250ms apart), but the min-travel
+    // gate below also spaces points out in time, so a slow dance drew no trail
+    // at all: every one of its segments looked like a tracking gap.
+    if (!p && last) last.brk = true;
+    // A trail point lands only after real travel: at rest the tracker's
+    // simmer painted a scribbling blob on every trailed joint. Standing still
+    // adds nothing and the streak simply fades out.
+    if (p && (!last || Math.hypot(p.x - last.x, p.y - last.y) > Math.max(2, sc * 0.015))) {
+      arr.push({ x: p.x, y: p.y, t: now });
+    }
     while (arr.length && now - arr[0].t > TRAIL_MS) arr.shift();
   }
   octx.save();
@@ -1026,7 +1055,7 @@ function drawPresence(lms, now) {
     if (!arr || arr.length < 2) continue;
     for (let k = 1; k < arr.length; k++) {
       const a = arr[k - 1], b = arr[k];
-      if (b.t - a.t > 250) continue; // tracking gap: do not bridge it
+      if (a.brk) continue; // tracking gap: do not bridge it
       const fade = Math.max(0, 1 - (now - b.t) / TRAIL_MS);
       // A marker stroke: one opaque pass with a dry, uneven edge, plus a
       // ghost of the second ink pass sitting off register beneath it.
@@ -1041,10 +1070,58 @@ function drawPresence(lms, now) {
   }
   // The constellation: one mark per joint.
   if (P && sc > 8) {
+    // During a teach, the wrist whose hand acts next wears a yellow turn ring
+    // (right starts, left stops). This replaces the old floating R/L labels,
+    // which doubled every letter already inked on the discs.
+    const activeWrist = teach && !teach.manual && !playback
+      ? (teach.state === "capturing" ? 15 : 16)
+      : -1;
+    // Dead-band radius for the marks, scaled to the body: ~3 px of tracker
+    // simmer on a standing body must not move a single mark.
+    const dead = Math.max(2, (scSmooth || sc) * 0.02);
     for (const o of ORB_DEFS) {
-      const p = P(o.i);
-      if (!p) continue;
-      const r = Math.max(4, sc * o.r);
+      let p = P(o.i);
+      if (!p) {
+        // A mark that is deliberately HELD survives a visibility dropout at
+        // its held position: the covering palm occludes the very landmarks
+        // being held (the nose under the hand, the latched wrist), and the
+        // countdown target vanishing mid-gesture read as a glitch.
+        const holding =
+          (o.i === 0 && isNearFace()) ||
+          (o.i === 15 && handOnFace.left.on) ||
+          (o.i === 16 && handOnFace.right.on);
+        const m = holding ? markPos.get(o.i) : null;
+        if (!m) { markPos.delete(o.i); continue; }
+        p = { x: m.x, y: m.y };
+      }
+      if (o.i === 0) {
+        // The face egg tracks the nose+ears AVERAGE, not the nose alone: a
+        // covering palm drags the occluded nose estimate sideways while the
+        // ears hold, which made the face mark slide out from under the very
+        // hand aiming at it. While a wrist is near the face the mark is held
+        // in place outright (the head does not move while being covered).
+        const pts = FACE_LMS.map((j) => lms[j]).filter((q) => q && (q.visibility ?? 0) > 0.3);
+        if (pts.length) {
+          p = {
+            x: (pts.reduce((s, q) => s + q.x, 0) / pts.length) * overlay.width,
+            y: (pts.reduce((s, q) => s + q.y, 0) / pts.length) * overlay.height,
+          };
+        }
+        p = settleMark(0, p.x, p.y, isNearFace() ? 0.06 : 0.45, dead);
+      } else if (o.i === 15 || o.i === 16) {
+        // A wrist latched onto the face DOCKS its mark on the face target and
+        // sits there: the estimates thrash under the palm, and the disc
+        // visibly landing on the face is the confirmation the pose is being
+        // read. (Freezing it at the latch position left it hanging short of
+        // the face, which read as the node refusing to overlap.)
+        const on = o.i === 15 ? handOnFace.left.on : handOnFace.right.on;
+        p = on && restInfo
+          ? settleMark(o.i, restInfo.anchor.x * overlay.width, restInfo.anchor.y * overlay.height, 0.3, dead)
+          : settleMark(o.i, p.x, p.y, 0.55, dead);
+      } else {
+        p = settleMark(o.i, p.x, p.y, 0.55, dead);
+      }
+      const r = Math.max(4, (scSmooth || sc) * o.r);
       // Printed, not lit: the ink pass lands first and a hair off register,
       // then the punched-out halftone disc on top of it.
       const off = Math.max(1.5, r * 0.16);
@@ -1107,6 +1184,13 @@ function drawPresence(lms, now) {
         octx.fillStyle = "rgba(28,24,21,.92)";
         octx.fillText(o.i === 16 ? "R" : "L", 0, 1);
         octx.restore();
+        if (o.i === activeWrist) {
+          octx.beginPath();
+          octx.arc(p.x, p.y, r * 1.05 + 4, 0, TAU);
+          octx.strokeStyle = "rgba(236,255,0,0.95)";
+          octx.lineWidth = 4;
+          octx.stroke();
+        }
       }
     }
   }
@@ -1253,19 +1337,35 @@ function buildPoseStrip(seq, { count = 3, size = 96 } = {}) {
 // smooths hard when the body is slow (kills jitter) and barely at all when
 // it is fast (no lag on real dance moves). Applied to the tracked person's
 // landmarks before anything else consumes them.
-// Hz: smoothing floor at rest. This was 1.5, which left a stationary wrist
-// visibly jittering, and that jitter was enough to shake the hand off the face
-// marker and cancel a countdown. Beta below still unlocks the filter as soon as
-// you actually move, so a held pose is steady without a danced one lagging.
-const EURO_MIN_CUTOFF = 0.9;
-// Raised alongside the lower floor above. One Euro's cutoff is
-// min_cutoff + beta*speed, so dropping the floor from 1.5 to 0.9 would have
-// slowed fast limbs too; 0.5 puts a moving hand back where it was (0.9 + 0.5v
-// vs the old 1.5 + 0.3v cross over around normal dance speed) while a still one
-// keeps the extra smoothing.
-const EURO_BETA = 0.5;
+// Hz: smoothing floor at rest. Walked down 1.5 -> 0.9 -> 0.4: every higher
+// value left a standing body's marks visibly simmering, and at rest NOTHING
+// real is happening at sub-Hz frequencies, so the floor can sit this low.
+// Beta below unlocks the filter the moment you actually move.
+const EURO_MIN_CUTOFF = 0.4;
+// Raised with each floor drop. One Euro's cutoff is min_cutoff + beta*speed:
+// 0.4 + 1.2v overtakes the old 0.9 + 0.5v at v ~= 0.7 torso-units/s, so
+// danced movement tracks TIGHTER than before while a held pose gets twice the
+// smoothing. Only very slow deliberate drifts smooth a touch more than they
+// used to, and the dead-band in settleMark masks nothing at that speed.
+const EURO_BETA = 1.2;
 const EURO_D_CUTOFF = 1.0;   // Hz: derivative smoothing
-const euro = { t: 0, x: null, dx: null, n: 0 };
+// Visibility is smoothed too (same low-pass), because the raw per-frame score
+// flutters around draw/gate thresholds while a landmark is half-occluded,
+// which made the face and wrist marks flicker during the hand-over-face
+// start/stop gesture.
+const EURO_VIS_CUTOFF = 1.0;
+// A barely-seen landmark's position is a guess, and guesses jump around. The
+// speed-unlock (beta) must not treat that noise as real motion, so both the
+// smoothing floor and the speed term are scaled down as confidence falls:
+// below VIS_LO the point is near-frozen, above VIS_HI it behaves exactly as
+// before. The band is deliberately LOW and NARROW: elbows and knees sit at
+// 0.3-0.5 visibility all the time while being tracked perfectly well, and a
+// band reaching that high made their marks trail the real joint during a
+// move. Only true dropouts belong below it; the covered face and wrist are
+// handled semantically in drawPresence (dock/hold), not here.
+const EURO_VIS_LO = 0.1;
+const EURO_VIS_HI = 0.35;
+const euro = { t: 0, x: null, dx: null, v: null, n: 0 };
 function lowpassAlpha(dt, cutoff) {
   const r = 2 * Math.PI * cutoff * dt;
   return r / (r + 1);
@@ -1279,6 +1379,7 @@ function smoothPose(lms, now) {
   if (!euro.x || euro.n !== n || t - euro.t > 0.5 || jumped) {
     euro.x = lms.map((p) => ({ x: p?.x ?? 0, y: p?.y ?? 0 }));
     euro.dx = lms.map(() => ({ x: 0, y: 0 }));
+    euro.v = lms.map((p) => p?.visibility ?? 0);
     euro.n = n;
     euro.t = t;
     return lms;
@@ -1286,16 +1387,35 @@ function smoothPose(lms, now) {
   const dt = Math.max(1e-3, t - euro.t);
   euro.t = t;
   const ad = lowpassAlpha(dt, EURO_D_CUTOFF);
+  const av = lowpassAlpha(dt, EURO_VIS_CUTOFF);
   const out = new Array(n);
   for (let i = 0; i < n; i++) {
     const p = lms[i];
     if (!p) { out[i] = p; continue; }
     const prev = euro.x[i], d = euro.dx[i];
+    euro.v[i] += av * ((p.visibility ?? 0) - euro.v[i]);
+    // Confidence 0..1 over the LO..HI visibility band: at low confidence the
+    // position estimate is a hallucination, so freeze it hard (tiny floor, no
+    // speed unlock) instead of chasing the noise. Gated on the BETTER of the
+    // raw and smoothed scores, and that choice is load-bearing in both
+    // directions. Raw alone flutters during fast moves (motion blur knocks
+    // single frames under the band), and every dip froze the mark mid-move
+    // then snapped it forward: a stutter worse than the jitter being fixed.
+    // Smoothed alone lags on reappearance, leaving the mark sitting off the
+    // body while the score crawls back up. The max rides over one-frame dips
+    // (smoothed stays high), regains full responsiveness the frame a landmark
+    // is re-seen (raw jumps), and still freezes a true dropout once the
+    // smoothed score decays, about a third of a second in.
+    const rawV = p.visibility ?? 0;
+    const visForConf = Math.max(rawV, euro.v[i]);
+    const conf = Math.min(1, Math.max(0, (visForConf - EURO_VIS_LO) / (EURO_VIS_HI - EURO_VIS_LO)));
+    const mc = EURO_MIN_CUTOFF * (0.25 + 0.75 * conf);
+    const beta = EURO_BETA * conf;
     d.x += ad * ((p.x - prev.x) / dt - d.x);
     d.y += ad * ((p.y - prev.y) / dt - d.y);
-    prev.x += lowpassAlpha(dt, EURO_MIN_CUTOFF + EURO_BETA * Math.abs(d.x)) * (p.x - prev.x);
-    prev.y += lowpassAlpha(dt, EURO_MIN_CUTOFF + EURO_BETA * Math.abs(d.y)) * (p.y - prev.y);
-    out[i] = { x: prev.x, y: prev.y, visibility: p.visibility };
+    prev.x += lowpassAlpha(dt, mc + beta * Math.abs(d.x)) * (p.x - prev.x);
+    prev.y += lowpassAlpha(dt, mc + beta * Math.abs(d.y)) * (p.y - prev.y);
+    out[i] = { x: prev.x, y: prev.y, visibility: euro.v[i] };
   }
   return out;
 }
@@ -1369,7 +1489,16 @@ async function runFrame() {
           // Nose distance from the hip origin in torso units: the playback
           // ghost calibrates its scale against this so its head lands on the
           // performer's actual face, not on a standard body's proportions.
-          liveFrame = { cx, cy, torso, headDist: Math.hypot(vec[0], vec[1]), at: now };
+          // headVis gates the ghost's head-size calibration: right after a
+          // hand-over-face the nose estimate is the least trustworthy
+          // landmark on the body, and a garbage nose here re-scaled the
+          // whole figure off the performer.
+          liveFrame = {
+            cx, cy, torso,
+            headDist: Math.hypot(vec[0], vec[1]),
+            headVis: lms[0]?.visibility ?? 0,
+            at: now,
+          };
         }
         const hands = updateHandsOnFace(lms, now);
         const nearNow = isNearFace();
@@ -1447,12 +1576,10 @@ async function runFrame() {
             setPerformState();
           }
         }
-        // R/L hand labels belong to Teach only. The
-        // R/L letters also show on the idle Teach tab (small, quiet) so you
-        // see which hand starts and which stops BEFORE clicking Record.
-        if (teach && !teach.manual && !playback) { drawHandLabels(lms); }
-        else if (!teach && currentTab === "teach" && !playback) {
-          drawHandLabels(lms);
+        // The R/L letters ride the wrist discs themselves (drawPresence); the
+        // idle Teach tab only needs the hands-lost warning and the no-click
+        // rearm below.
+        if (!teach && currentTab === "teach" && !playback) {
           // Say it before they hit Record, not after the take is wasted.
           if (!lastHandVis && !teachHandsLost) {
             teachHandsLost = true;
@@ -3349,7 +3476,7 @@ function drawPlayback(now) {
     // through the move so dancing never re-scales the ghost.
     const g0 = cur.seq[0];
     const gHead = Math.hypot(g0[0], g0[1]);
-    if (leading && liveFrame.headDist && gHead > 0.5) {
+    if (leading && liveFrame.headDist && liveFrame.headVis > 0.5 && gHead > 0.5) {
       const r = Math.max(0.85, Math.min(1.2, liveFrame.headDist / gHead));
       pb.scaleCal = pb.scaleCal == null ? r : pb.scaleCal + (r - pb.scaleCal) * 0.1;
     }
