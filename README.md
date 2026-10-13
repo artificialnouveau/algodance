@@ -84,6 +84,13 @@ Any static server works (`npx serve`, etc.). Allow camera access when prompted.
 > is the default and the most thoroughly tested path; if an algorithm fails to
 > load, the app reverts to the previous one and keeps running.
 
+### Tests
+
+`node test/run-tests.mjs` drives the real state machines (hand-over-face
+detection, the whole teach flow, pose picking, smoothing, trails) headlessly
+with synthetic landmark data: no browser, no dependencies. Run it before
+pushing changes to `app.js`; it exits non-zero on a failure.
+
 ## Use
 
 - **Teach:** name a word, click Record, cover your face with your right hand
