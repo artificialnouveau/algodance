@@ -1044,7 +1044,12 @@ function drawPresence(lms, now) {
     P = (i) => {
       const p = lms[i];
       const v = p ? (p.visibility ?? 1) : 0;
-      const on = nodeShown.has(i) ? v > 0.22 : v > 0.38;
+      // In confirmed low light the model's confidences are inflated relative
+      // to its accuracy, so only solidly-seen joints get drawn: fewer dots is
+      // honest; dots on the wall are not.
+      const showAt = lowLight ? 0.6 : 0.38;
+      const keepAt = lowLight ? 0.45 : 0.22;
+      const on = nodeShown.has(i) ? v > keepAt : v > showAt;
       if (on) nodeShown.add(i); else nodeShown.delete(i);
       return on
         ? { x: p.x * overlay.width, y: p.y * overlay.height }
@@ -1454,6 +1459,77 @@ function smoothPose(lms, now) {
   return out;
 }
 
+// ---------- Low-light monitor ----------
+// In the dark the pose model does not fail cleanly: it keeps emitting
+// plausible-looking landmarks in the WRONG places, so the skeleton glitches
+// instead of disappearing, and nobody is at the installation to explain why.
+// The app measures the light itself (a 32x18 downsample of the video, twice a
+// second) and, when it is genuinely too dark, says so over the video, draws
+// only confidently-seen nodes, and pauses matching so the glitching cannot
+// fire wrong words.
+const LUMA_SAMPLE_MS = 500;
+const LUMA_DARK = 34;   // mean luma (0-255) that is dark no matter what
+const LUMA_DIM = 70;    // dim enough to distrust IF tracking is also struggling
+const LUMA_HYST = 12;   // extra luma required to leave the low-light state
+const LOWLIGHT_WARN_MS = 2500;  // sustained darkness before the notice appears
+const LOWLIGHT_CLEAR_MS = 1200; // sustained light before it goes
+const lightNote = document.getElementById("lightNote");
+let lowLight = false;
+let lumaAvg = -1;       // EMA of the sampled mean luma; -1 = nothing sampled yet
+let darkSince = 0;      // when the raw reading started disagreeing with state
+let lastLumaAt = 0;
+let coreVisAvg = 1;     // EMA of core-landmark visibility while a body tracks
+let coreVisAt = 0;
+let lightC = null, lightX = null;
+function noteCoreVis(lms, now) {
+  const CORE = [0, 11, 12, 15, 16, 23, 24]; // nose, shoulders, wrists, hips
+  let s = 0;
+  for (const i of CORE) s += lms[i]?.visibility ?? 0;
+  const v = s / CORE.length;
+  coreVisAvg = coreVisAt ? coreVisAvg + (v - coreVisAvg) * 0.1 : v;
+  coreVisAt = now;
+}
+function sampleLight(now) {
+  if (!lightC) {
+    lightC = document.createElement("canvas");
+    lightC.width = 32;
+    lightC.height = 18;
+    lightX = lightC.getContext("2d", { willReadFrequently: true });
+  }
+  lightX.drawImage(video, 0, 0, 32, 18);
+  const d = lightX.getImageData(0, 0, 32, 18).data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) sum += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+  const luma = sum / (d.length / 4);
+  lumaAvg = lumaAvg < 0 ? luma : lumaAvg + (luma - lumaAvg) * 0.3;
+  // Two ways to be "too dark": plainly dark, or dim with the camera's
+  // auto-gain brightening the image while the model's confidence sags (the
+  // grainy-evening failure: bright-ish pixels, garbage landmarks). The
+  // struggling test only counts a RECENT body; an empty dim room is not
+  // evidence of bad tracking.
+  const struggling = now - coreVisAt < 2000 && coreVisAvg < 0.5;
+  const dk = lowLight ? LUMA_DARK + LUMA_HYST : LUMA_DARK;
+  const dm = lowLight ? LUMA_DIM + LUMA_HYST : LUMA_DIM;
+  const dark = lumaAvg >= 0 && (lumaAvg < dk || (lumaAvg < dm && struggling));
+  if (dark !== lowLight) {
+    if (!darkSince) darkSince = now;
+    else if (now - darkSince > (dark ? LOWLIGHT_WARN_MS : LOWLIGHT_CLEAR_MS)) {
+      darkSince = 0;
+      setLowLight(dark);
+    }
+  } else {
+    darkSince = 0;
+  }
+}
+function setLowLight(on) {
+  lowLight = on;
+  if (lightNote) {
+    lightNote.hidden = !on;
+    if (on) lightNote.innerHTML = "<b>Too dark to track.</b> In low light the dots guess. Turn on a light and they will settle.";
+  }
+  diag(on ? `low light (luma ${Math.round(lumaAvg)}): matching paused` : "light restored: matching resumed");
+}
+
 // ---------- Main loop ----------
 // Async because MoveNet detects asynchronously; `inflight` keeps frames
 // from overlapping. Detection is throttled to ~30fps, which is plenty for
@@ -1483,6 +1559,13 @@ async function loop() {
     try { compositeCutout(t); }
     catch (e) { console.warn("cutout failed:", e); }
   }
+  // Light is sampled on the render loop, not the detect path, so a stalled or
+  // erroring detector can still report "too dark", which is often WHY it stalls.
+  if (!idleTab && video.readyState >= 2 && t - lastLumaAt >= LUMA_SAMPLE_MS) {
+    lastLumaAt = t;
+    try { sampleLight(t); }
+    catch { /* a starved decoder can refuse the readback; next sample retries */ }
+  }
 }
 
 async function runFrame() {
@@ -1507,6 +1590,7 @@ async function runFrame() {
     drawPresence(lms, now);
     if (lms) {
       liveLmsNow = { lms, at: now }; // follow-along feedback reads this
+      noteCoreVis(lms, now);         // feeds the low-light monitor
       if (keyLandmarksVisible(lms)) {
         bodyVisible = true;
         const vec = normalizePose(lms);
@@ -1582,14 +1666,14 @@ async function runFrame() {
             if (now >= bgCapture.until) finishBgCapture();
           } else if (triggerMode === "manual") {
             if (manualCapturing) manualFrames.push(vec); // deliberate capture: record everything
-          } else if (handVis) {
+          } else if (handVis && !lowLight) {
             // Perform is continuous but fires only when a whole move completes.
             // Per-joint tracking confidence rides along so barely-seen joints
             // count less in matching.
             const conf = lms.map((p) => Math.max(0.2, Math.min(1, p?.visibility ?? 0.5)));
             performStep(vec, now, hands.left || hands.right, conf);
           } else {
-            moving = false;      // a half-tracked move is not evidence
+            moving = false;      // a half-tracked or in-the-dark move is not evidence
             stillSince = 0;
           }
           // Status is driven off the DEBOUNCED reading and written only when it
@@ -1600,12 +1684,14 @@ async function runFrame() {
           // "matching is paused" would be untrue there.
           if (bgCapture || triggerMode === "manual") {
             perfHandsLost = false;
-          } else if (!handsOk && !perfHandsLost) {
+          } else if ((!handsOk || lowLight) && !perfHandsLost) {
             perfHandsLost = true;
             setBar(0);
             hideClosest();
-            statusEl.textContent = "Can't see your hands. Keep at least one hand in view; matching is paused.";
-          } else if (handsOk && perfHandsLost) {
+            statusEl.textContent = lowLight
+              ? "Too dark to track reliably. Matching is paused; add light."
+              : "Can't see your hands. Keep at least one hand in view; matching is paused.";
+          } else if (handsOk && !lowLight && perfHandsLost) {
             perfHandsLost = false;
             setPerformState();
           }
@@ -1712,7 +1798,7 @@ const MAX_MOVE_MS = 7000;
 const perfBuf = [];               // {vec, t}
 let moving = false, moveStart = 0, lastActive = 0;
 let liveScoreAt = 0;              // last in-progress feedback scan (throttled)
-let perfHandsLost = false;        // matching paused because no wrist is tracked
+let perfHandsLost = false;        // "matching is paused" warning is on screen (hands lost or low light)
 let teachHandsLost = false;       // same warning, on the idle Teach tab
 let lastHandVis = true;           // debounced: are the hands usable, steadily
 let handsOk = true;               // the debounced state itself
@@ -4694,7 +4780,7 @@ document.getElementById("introDismiss").addEventListener("click", () => {
 
 (async function boot() {
   // Build tag, so "which version am I actually running?" has an answer.
-  console.log("AlgoDance build v85 (2026-10-13)");
+  console.log("AlgoDance build v86 (2026-10-14)");
   // Pre-warm the speech engine: the voice list loads lazily, and asking for it
   // up front shaves the extra-long delay off the FIRST spoken match.
   if ("speechSynthesis" in window) speechSynthesis.getVoices();

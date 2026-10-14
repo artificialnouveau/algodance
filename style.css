@@ -1542,6 +1542,28 @@ body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
 }
 .attract-note b { font-family: var(--font-display); font-weight: 900; letter-spacing: .02em; }
 
+/* Low-light notice: the ink counterpart of the attract card (a warning, not
+   an invitation), top-left so the two never overlap. */
+.light-note {
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  transform: rotate(-1.2deg);
+  z-index: 4;
+  max-width: min(46%, 420px);
+  text-align: center;
+  background: var(--ink);
+  color: var(--yellow);
+  border: 1.5px solid var(--yellow);
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: clamp(13px, 2vw, 19px);
+  padding: 8px 16px;
+  box-shadow: 3px 4px 0 var(--accent), 5px 8px 18px rgba(0,0,0,.45);
+  pointer-events: none;
+}
+.light-note b { font-family: var(--font-display); font-weight: 900; letter-spacing: .02em; }
+
 /* The registration mark is the latch for the back of the sheet: it has to
    accept the press its container refuses. */
 .mm-marks .reg { pointer-events: auto; cursor: pointer; }
@@ -1644,7 +1666,8 @@ body.cutout .video-wrap::after { mix-blend-mode: multiply; opacity: .32; }
   .paper-dialog-card,
   /* right/top anchored: a translateX(-50%) left over from a centered layout
      shoved the caption half its width off its corner for reduced-motion users. */
-  .attract-note { transform: none; }
+  .attract-note,
+  .light-note { transform: none; }
 }
 
 /* Stacked full-width actions breathe apart instead of touching edges. */

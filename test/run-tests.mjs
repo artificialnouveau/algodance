@@ -96,6 +96,8 @@ globalThis.__T = {
   startTeach, teachStep, updateHandsOnFace, clearHandsOnFace, handOnFace, isNearFace,
   pickMainPose, smoothPose, drawPresence, resampleSeq, migrateSq, dtw, poseDist,
   trimStillEnds, trimLeadIn, travelOf, thresholdFor, recomputeWordStats,
+  setLowLight, lightNote,
+  get lowLight() { return lowLight; },
 };
 `;
 
@@ -289,6 +291,41 @@ console.log("T6: migrateSq renormalizes an old 4:3 code to torso length 1");
   const torso = Math.hypot(sx - hx, sy - hy);
   check("migrated torso length is 1", Math.abs(torso - 1) < 1e-9, torso.toFixed(6));
   check("migration marks sq:1", t.sq === 1);
+}
+
+console.log("T7: low light hides guessed nodes and shows the notice");
+{
+  T.clearHandsOnFace();
+  let now = 1200000;
+  const frame = (vis) => {
+    const lms = standing();
+    lms[15] = { x: 0.68, y: 0.74, visibility: vis };
+    return lms;
+  };
+  // First make the wrist node hidden (vis under the normal 0.22 keep gate).
+  for (let i = 0; i < 5; i++) { T.drawPresence(frame(0.05), now); now += 33; }
+  const trailLen = () => (T.trails.get(15) || []).filter((p) => !p.brk && now - p.t <= 900).length;
+
+  T.setLowLight(true);
+  check("low-light notice is shown", T.lowLight === true && T.lightNote.hidden === false);
+  // A half-confident wrist (0.5) clears the normal 0.38 show gate but must
+  // NOT clear the low-light 0.6 gate: no node, so no trail points either.
+  const before = trailLen();
+  for (let i = 0; i < 20; i++) {
+    const lms = frame(0.5);
+    lms[15].x = 0.68 + i * 0.004; // moving, so the travel gate is not the reason
+    T.drawPresence(lms, now); now += 33;
+  }
+  check("half-confident wrist is not drawn in low light", trailLen() <= before, trailLen() + " pts");
+
+  T.setLowLight(false);
+  check("notice clears with the light", T.lowLight === false && T.lightNote.hidden === true);
+  for (let i = 0; i < 20; i++) {
+    const lms = frame(0.5);
+    lms[15].x = 0.68 + i * 0.004;
+    T.drawPresence(lms, now); now += 33;
+  }
+  check("same wrist draws again in normal light", trailLen() >= 2, trailLen() + " pts");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

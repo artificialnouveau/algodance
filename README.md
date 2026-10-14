@@ -87,7 +87,8 @@ Any static server works (`npx serve`, etc.). Allow camera access when prompted.
 ### Tests
 
 `node test/run-tests.mjs` drives the real state machines (hand-over-face
-detection, the whole teach flow, pose picking, smoothing, trails) headlessly
+detection, the whole teach flow, pose picking, smoothing, trails, the
+low-light guard) headlessly
 with synthetic landmark data: no browser, no dependencies. Run it before
 pushing changes to `app.js`; it exits non-zero on a failure.
 
@@ -121,6 +122,9 @@ pushing changes to `app.js`; it exits non-zero on a failure.
 - Check that the glowing dots appear on your joints when you step into view
   (tracking feedback); if they never do, adjust
   framing so at least your head and shoulders are clearly in view.
+- If a "Too dark to track" notice appears over the video, the room really is
+  too dark for the pose model: it starts guessing joint positions, so the app
+  pauses matching and hides uncertain dots until there is more light.
 - Make the movement bigger. Very small movements are treated as jitter.
 - Try BlazePose Full or Heavy; Lite (and Lightning) can lose fast limbs.
 - As a fallback, switch Trigger to Manual in the Perform tab and hold the
