@@ -38,7 +38,11 @@ function makeEl(tag = "div") {
       toggle(c, f) { const on = f === undefined ? !classes.has(c) : !!f; on ? classes.add(c) : classes.delete(c); return on; },
       contains(c) { return classes.has(c); },
     },
-    value: "", textContent: "", innerHTML: "", title: "", className: "",
+    value: "", textContent: "", innerHTML: "", title: "",
+    // className writes sync into classList: the app sets one and reads the
+    // other (e.g. the big-status countdown classes in updateCaptureOverlay).
+    get className() { return [...classes].join(" "); },
+    set className(v) { classes.clear(); String(v).split(/\\s+/).filter(Boolean).forEach((c) => classes.add(c)); },
     hidden: false, disabled: false, checked: false, offsetWidth: 0, firstChild: null,
     width: 0, height: 0, videoWidth: 640, videoHeight: 480, readyState: 4, clientHeight: 640,
     addEventListener() {}, removeEventListener() {}, dispatchEvent() {},
@@ -94,6 +98,7 @@ globalThis.__T = {
   get markPos() { return markPos; },
   overlay, wordInput, teachMsg, recordBtn, statusEl, threshInput,
   startTeach, teachStep, updateHandsOnFace, clearHandsOnFace, handOnFace, isNearFace,
+  updateCaptureOverlay, countLabel, bigStatus,
   pickMainPose, smoothPose, drawPresence, resampleSeq, migrateSq, dtw, poseDist,
   trimStillEnds, trimLeadIn, travelOf, thresholdFor, recomputeWordStats,
   setLowLight, lightNote,
@@ -326,6 +331,115 @@ console.log("T7: low light hides guessed nodes and shows the notice");
     T.drawPresence(lms, now); now += 33;
   }
   check("same wrist draws again in normal light", trailLen() >= 2, trailLen() + " pts");
+}
+
+console.log("T8: a full palm cover (face AND wrist occluded) completes both 3s holds");
+{
+  // The video-reproduced bug: covering the face properly hides the nose, the
+  // ears and the covering wrist. The face anchor then expired mid-hold
+  // (1500ms stickiness + 700ms grace < 3000ms hold) and the countdown
+  // canceled right around "1". The whole teach must now survive it.
+  T.clearHandsOnFace();
+  const before = T.templates.length;
+  T.wordInput.value = "occlusion";
+  T.startTeach();
+  let now = performance.now() + 120000;
+  const vecAt = (w) => { const v = new Array(66).fill(0); v[30] = w; v[31] = -w; return v; };
+  const step = (lms, vec) => {
+    const h = T.updateHandsOnFace(lms, now);
+    if (T.teach) T.teachStep(vec, h, T.isNearFace(), now, true);
+    now += 33;
+    return h;
+  };
+  // Right hand covers, fully visible at first (that is how the latch forms).
+  const coverR = standing();
+  coverR[16] = { x: 0.5, y: 0.35, visibility: 0.9 };
+  coverR[14] = { x: 0.5, y: 0.52, visibility: 0.9 };
+  // Then the palm hides the face AND its own wrist: only shoulders stay seen.
+  const hiddenR = standing();
+  hiddenR[0] = { x: 0.5, y: 0.3, visibility: 0.05 };
+  hiddenR[7] = { x: 0.55, y: 0.3, visibility: 0.05 };
+  hiddenR[8] = { x: 0.45, y: 0.3, visibility: 0.05 };
+  hiddenR[16] = { x: 0.5, y: 0.35, visibility: 0.05 };
+  hiddenR[14] = { x: 0.5, y: 0.52, visibility: 0.9 };
+
+  for (let i = 0; i < 5; i++) step(standing(), vecAt(0));   // arm: right hand off
+  for (let i = 0; i < 20; i++) step(coverR, vecAt(0));      // visible cover -> starting
+  check("visible cover starts the countdown", T.teach && T.teach.state === "starting");
+  let rHeld = true;
+  for (let i = 0; i < 100 && T.teach.state === "starting"; i++) {
+    const h = step(hiddenR, vecAt(0));
+    if (T.teach.state === "starting" && !h.right) rHeld = false;
+  }
+  check("latch survives 3s of full occlusion", rHeld);
+  check("occluded hold still begins the capture", T.teach && T.teach.state === "capturing");
+
+  // The move: sweep, then settle; the right hand is seen away and releases.
+  for (let i = 0; i <= 16; i++) step(standing(), vecAt(i * 0.05));
+  for (let i = 0; i < 10; i++) step(standing(), vecAt(0.8));
+  check("wrist seen away releases after the hold", !T.handOnFace.right.on);
+
+  // Left hand covers to stop, then is swallowed by the palm the same way.
+  const coverL = standing();
+  coverL[15] = { x: 0.5, y: 0.35, visibility: 0.9 };
+  coverL[13] = { x: 0.5, y: 0.52, visibility: 0.9 };
+  const hiddenL = standing();
+  hiddenL[0] = { x: 0.5, y: 0.3, visibility: 0.05 };
+  hiddenL[7] = { x: 0.55, y: 0.3, visibility: 0.05 };
+  hiddenL[8] = { x: 0.45, y: 0.3, visibility: 0.05 };
+  hiddenL[15] = { x: 0.5, y: 0.35, visibility: 0.05 };
+  hiddenL[13] = { x: 0.5, y: 0.52, visibility: 0.9 };
+  for (let i = 0; i < 20; i++) step(coverL, vecAt(0.8));
+  for (let i = 0; i < 110 && T.teach; i++) step(hiddenL, vecAt(0.8));
+  check("occluded left hold stops and saves", T.teach === null);
+  check("the occluded take was saved", T.templates.length === before + 1, "len " + T.templates.length);
+}
+
+console.log("T9: a single-frame skeleton collapse no longer bypasses smoothing");
+{
+  const mk = (x, vis = 0.8) => { const l = new Array(33).fill(null); l[11] = { x, y: 0.5, visibility: vis }; return l; };
+  let now = 3000000; // time gap reinitializes the filter
+  T.smoothPose(mk(0.5), now);
+  for (let i = 0; i < 20; i++) { now += 33; T.smoothPose(mk(0.5), now); }
+  now += 33;
+  const garbage = T.smoothPose(mk(0.95), now); // one collapsed frame
+  check("one garbage jump is damped, not followed", garbage[11].x < 0.76, garbage[11].x.toFixed(3));
+  let out = null;
+  for (let i = 0; i < 5; i++) { now += 33; out = T.smoothPose(mk(0.5), now); }
+  check("recovers onto the body right after", Math.abs(out[11].x - 0.5) < 0.1, out[11].x.toFixed(3));
+  // A REAL person switch holds its new position: two jumped frames reset.
+  for (let i = 0; i < 20; i++) { now += 33; T.smoothPose(mk(0.5), now); }
+  now += 33;
+  T.smoothPose(mk(0.95), now);
+  now += 33;
+  const switched = T.smoothPose(mk(0.95), now);
+  check("a persistent jump resets onto the new person", switched[11].x === 0.95, switched[11].x.toFixed(3));
+}
+
+console.log("T10: a canceled countdown takes its 'recording in' label with it");
+{
+  T.clearHandsOnFace();
+  T.wordInput.value = "label";
+  T.startTeach();
+  let now = performance.now() + 300000;
+  const step = (lms) => {
+    const h = T.updateHandsOnFace(lms, now);
+    if (T.teach) T.teachStep(new Array(66).fill(0), h, T.isNearFace(), now, true);
+    now += 33;
+  };
+  const coverR = standing();
+  coverR[16] = { x: 0.5, y: 0.35, visibility: 0.9 };
+  coverR[14] = { x: 0.5, y: 0.52, visibility: 0.9 };
+  for (let i = 0; i < 5; i++) step(standing());
+  for (let i = 0; i < 20; i++) step(coverR);
+  check("countdown running", T.teach && T.teach.state === "starting");
+  T.updateCaptureOverlay(now);
+  check("label shows during the countdown", !T.countLabel.hidden && T.countLabel.textContent === "recording in");
+  // Hand drops and is SEEN away: past the grace window the countdown cancels.
+  for (let i = 0; i < 35; i++) step(standing());
+  check("sustained uncover cancels back to prime", T.teach && T.teach.state === "prime");
+  T.updateCaptureOverlay(now);
+  check("canceled countdown hides its label", T.countLabel.hidden === true);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -302,6 +302,12 @@ const handOnFace = {
 // on the face is treated as still there for this long, so a hold does not
 // break just because the hand did its job of covering.
 const UNSEEN_STICKY_MS = 600;
+// While a teach hold is in progress the window must outlast the whole 3s
+// countdown (plus the arm delay): a palm that fully hides its own wrist is
+// what a SUCCESSFUL cover looks like, and the short window above canceled the
+// countdown partway through. Outside a hold the short window still applies,
+// so a hallucinated latch cannot park a phantom hand on the face for long.
+const HOLD_UNSEEN_STICKY_MS = 4500;
 // The covering palm hides the very landmarks that detect it: nose/ears drop
 // out as the hand arrives, which used to stall the countdown for seconds.
 // The face anchor therefore survives brief occlusion (the head does not move
@@ -319,7 +325,16 @@ function clearHandsOnFace() {
 function updateHandsOnFace(lms, now) {
   const ls = lms[11], rs = lms[12];
   restInfo = null;
-  if ((ls?.visibility ?? 0) < 0.35 || (rs?.visibility ?? 0) < 0.35) return clearHandsOnFace();
+  if ((ls?.visibility ?? 0) < 0.35 || (rs?.visibility ?? 0) < 0.35) {
+    // A latched hand survives a shoulder-visibility dip: the pose estimate
+    // collapsing under a covering palm can sag the shoulders for a frame,
+    // and hard-clearing here bypassed every debounce below. Releasing still
+    // requires the wrist to be SEEN away once the shoulders are back.
+    if (handOnFace.left.on || handOnFace.right.on) {
+      return { left: handOnFace.left.on, right: handOnFace.right.on };
+    }
+    return clearHandsOnFace();
+  }
   const face = FACE_LMS.map((i) => lms[i]).filter((p) => (p?.visibility ?? 0) > 0.15);
   const scale = Math.hypot(ls.x - rs.x, ls.y - rs.y) || 1e-6; // shoulder width
   let anchor;
@@ -334,8 +349,16 @@ function updateHandsOnFace(lms, now) {
       y: face.reduce((s, p) => s + p.y, 0) / face.length + REST_DROP_Y * scale,
     };
     lastFaceAnchor = { x: anchor.x, y: anchor.y, at: now };
-  } else if (lastFaceAnchor && now - lastFaceAnchor.at < ANCHOR_STICKY_MS) {
-    anchor = lastFaceAnchor; // palm is hiding the face; keep the last known spot
+  } else if (lastFaceAnchor &&
+    (now - lastFaceAnchor.at < ANCHOR_STICKY_MS || handOnFace.left.on || handOnFace.right.on)) {
+    // Palm is hiding the face; keep the last known spot. While a hand is
+    // LATCHED the anchor never expires: a fully invisible face is what a
+    // successful cover looks like, and the head does not move while covered.
+    // Expiring it mid-hold canceled the 3s countdown right around "1"
+    // (1500ms stickiness + 700ms grace < 3000ms hold). The latch itself
+    // still releases when the wrist is seen away from the face or its own
+    // unseen window runs out, so a stale anchor cannot outlive the gesture.
+    anchor = lastFaceAnchor;
   } else {
     return clearHandsOnFace();
   }
@@ -346,7 +369,15 @@ function updateHandsOnFace(lms, now) {
   // which used to false-trigger the recording commands. Debounced per hand,
   // and an unseen wrist stays briefly "on" (leaving the face requires being
   // SEEN away from it, not just disappearing behind it).
-  const check = (w, e, st) => {
+  // Which hand is mid-hold right now: the RIGHT hand arms/starts a teach
+  // (prime/starting), the LEFT hand stops one (capturing). That hand's unseen
+  // window is stretched past the full countdown; the other keeps the short one.
+  const inTeach = teach && !teach.manual;
+  const rStick = inTeach && (teach.state === "prime" || teach.state === "starting")
+    ? HOLD_UNSEEN_STICKY_MS : UNSEEN_STICKY_MS;
+  const lStick = inTeach && teach.state === "capturing"
+    ? HOLD_UNSEEN_STICKY_MS : UNSEEN_STICKY_MS;
+  const check = (w, e, st, stick) => {
     const rThr = st.on ? REST_EXIT : REST_ENTER;
     const xThr = st.on ? CENTER_X_EXIT : CENTER_X_ENTER;
     const upThr = st.on ? 0.08 : 0.2; // (elbow.y - wrist.y) in shoulder widths
@@ -359,7 +390,7 @@ function updateHandsOnFace(lms, now) {
       inRange = d < rThr && dx < xThr && forearmUp;
     } else if (st.on) {
       if (!st.unseenSince) st.unseenSince = now;
-      inRange = now - st.unseenSince < UNSEEN_STICKY_MS;
+      inRange = now - st.unseenSince < stick;
     }
     if (inRange !== st.on) {
       st.streak++;
@@ -369,8 +400,8 @@ function updateHandsOnFace(lms, now) {
     }
     return d;
   };
-  const dL = check(lms[15], lms[13], handOnFace.left);
-  const dR = check(lms[16], lms[14], handOnFace.right);
+  const dL = check(lms[15], lms[13], handOnFace.left, lStick);
+  const dR = check(lms[16], lms[14], handOnFace.right, rStick);
   restInfo = { anchor, scale, d: Math.min(dL, dR), on: handOnFace.left.on || handOnFace.right.on };
   return { left: handOnFace.left.on, right: handOnFace.right.on };
 }
@@ -1404,7 +1435,7 @@ const EURO_VIS_CUTOFF = 1.0;
 // handled semantically in drawPresence (dock/hold), not here.
 const EURO_VIS_LO = 0.1;
 const EURO_VIS_HI = 0.35;
-const euro = { t: 0, x: null, dx: null, v: null, n: 0 };
+const euro = { t: 0, x: null, dx: null, v: null, n: 0, jumpStreak: 0 };
 function lowpassAlpha(dt, cutoff) {
   const r = 2 * Math.PI * cutoff * dt;
   return r / (r + 1);
@@ -1413,14 +1444,21 @@ function smoothPose(lms, now) {
   const t = now / 1000;
   const n = lms.length;
   // (Re)initialize after a tracking gap or a person switch (big shoulder jump).
+  // The jump must persist for TWO consecutive frames before it resets the
+  // filter: a palm occluding the face at close range makes the model emit
+  // single-frame whole-skeleton collapses, and resetting on each one passed
+  // the raw garbage straight through (the marks scattered over the face). A
+  // real person switch holds its new position, so it costs one frame of lag.
   const jumped = euro.x && euro.n === n && lms[11] && euro.x[11]
     && Math.hypot(lms[11].x - euro.x[11].x, lms[11].y - euro.x[11].y) > 0.25;
-  if (!euro.x || euro.n !== n || t - euro.t > 0.5 || jumped) {
+  euro.jumpStreak = jumped ? euro.jumpStreak + 1 : 0;
+  if (!euro.x || euro.n !== n || t - euro.t > 0.5 || euro.jumpStreak >= 2) {
     euro.x = lms.map((p) => ({ x: p?.x ?? 0, y: p?.y ?? 0 }));
     euro.dx = lms.map(() => ({ x: 0, y: 0 }));
     euro.v = lms.map((p) => p?.visibility ?? 0);
     euro.n = n;
     euro.t = t;
+    euro.jumpStreak = 0;
     return lms;
   }
   const dt = Math.max(1e-3, t - euro.t);
@@ -2749,7 +2787,9 @@ function updateCaptureOverlay(now) {
     countLabel.className = "count-label mid" + (kind === "stop" ? " lead" : "");
   } else if (bigStatus.classList.contains("rec") || bigStatus.classList.contains("count") || bigStatus.classList.contains("stop")) {
     bigStatus.className = "big-status"; // leave SAVED flashes alone
-    if (!playback && !teach) countLabel.hidden = true;
+    // Also when a teach is still active: a countdown that cancels back to
+    // prime used to leave its "recording in" label floating with no number.
+    if (!playback) countLabel.hidden = true;
   }
 
   // Riso treatment: on while actually recording a pose, plus a short window
