@@ -96,8 +96,9 @@ globalThis.__T = {
   get restInfo() { return restInfo; },
   get trails() { return trails; },
   get markPos() { return markPos; },
-  overlay, wordInput, teachMsg, recordBtn, statusEl, threshInput,
+  overlay, wordInput, teachMsg, recordBtn, statusEl, threshInput, teachHint,
   startTeach, teachStep, updateHandsOnFace, clearHandsOnFace, handOnFace, isNearFace,
+  updateTeachUI, cancelTeach,
   updateCaptureOverlay, countLabel, bigStatus, stripIndices, pbTempo, judgeBeat,
   pickMainPose, smoothPose, drawPresence, resampleSeq, migrateSq, dtw, poseDist,
   trimStillEnds, trimLeadIn, travelOf, thresholdFor, recomputeWordStats,
@@ -492,6 +493,20 @@ console.log("T10: a canceled countdown takes its 'recording in' label with it");
   check("sustained uncover cancels back to prime", T.teach && T.teach.state === "prime");
   T.updateCaptureOverlay(now);
   check("canceled countdown hides its label", T.countLabel.hidden === true);
+}
+
+console.log("T14: the panel hint follows the teach state instead of saying Ready forever");
+{
+  if (T.teach) T.cancelTeach();
+  check("idle hint says Ready", T.teachHint.innerHTML.includes("Ready"));
+  T.wordInput.value = "hintword";
+  T.startTeach();
+  check("priming hint asks for the RIGHT hand", T.teachHint.innerHTML.includes("RIGHT"));
+  T.teach.state = "capturing";
+  T.updateTeachUI(false); // the hint reflects the state even while untracked
+  check("capturing hint asks for the LEFT hand", T.teachHint.innerHTML.includes("LEFT"));
+  T.cancelTeach();
+  check("cancel restores the Ready hint", T.teachHint.innerHTML.includes("Ready"));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

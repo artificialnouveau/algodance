@@ -99,6 +99,7 @@ const wordList = document.getElementById("wordList");
 const wordInput = document.getElementById("wordInput");
 const recordBtn = document.getElementById("recordBtn");
 const teachMsg = document.getElementById("teachMsg");
+const teachHint = document.getElementById("teachHint");
 
 const codeList = document.getElementById("codeList");
 const codeSearchEl = document.getElementById("codeSearch");
@@ -2921,6 +2922,7 @@ function startTeach() {
     armed: false, // require the face to be uncovered once before starting
     startedAt: performance.now(),
   };
+  setTeachHint(manual ? "manual" : "prime");
   if (manual) {
     recordBtn.textContent = "Stop & save";
     setTeachMsg("Recording… click Stop & save when your movement is done.", "");
@@ -3019,9 +3021,33 @@ function teachStep(vec, hands, near, now, handVis) {
 
 // On-screen overlay for the teach flow, driven every frame so it can also say
 // when the body is NOT being detected instead of silently freezing.
+// The panel's highlighted hint box. It was static HTML that kept saying
+// "Ready. Type or pick a word" through the countdown, the recording and the
+// save, contradicting the live state the moment Record was pressed. It now
+// follows the teach state machine, and resets when a capture ends.
+const TEACH_HINTS = {
+  ready: "<b>Ready.</b> Type or pick a word, then press <b>Record movement</b>.",
+  prime: "<b>Get set.</b> Cover your face with your <b>RIGHT</b> hand (R) and hold for the 3-2-1.",
+  starting: "<b>Hold it.</b> Keep your face covered through the 3-2-1; recording starts right after.",
+  capturing: "<b>Recording.</b> Dance your move, then cover your face with your <b>LEFT</b> hand (L) to stop and save.",
+  manual: "<b>Recording.</b> Click <b>Stop &amp; save</b> when your movement is done.",
+};
+let teachHintKey = "ready";
+function setTeachHint(key) {
+  if (key === teachHintKey) return;
+  teachHintKey = key;
+  teachHint.innerHTML = TEACH_HINTS[key] || TEACH_HINTS.ready;
+}
+// Written once at startup so the element and this module agree on the initial
+// state regardless of what the static markup says.
+teachHint.innerHTML = TEACH_HINTS.ready;
+
 function updateTeachUI(bodyVisible) {
   const t = teach;
   if (!t) return;
+  // Before any visibility early-returns: the hint describes the capture state,
+  // which holds whether or not the body is currently tracked.
+  setTeachHint(t.manual ? "manual" : t.state);
   if (!bodyVisible) {
     countdownEl.hidden = false;
     countdownEl.textContent = "?";
@@ -3061,6 +3087,7 @@ function updateTeachUI(bodyVisible) {
 function finishTeach(now, timedOut = false) {
   const t = teach;
   teach = null;
+  setTeachHint("ready");
   countdownEl.hidden = true;
   countLabel.hidden = true;
   recordBtn.disabled = false;
@@ -3157,6 +3184,7 @@ function clearTeachPreview() {
 
 function cancelTeach() {
   teach = null;
+  setTeachHint("ready");
   clearTimeout(ghostPreviewTimer);
   countdownEl.hidden = true;
   countLabel.hidden = true;
