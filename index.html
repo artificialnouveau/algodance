@@ -121,7 +121,8 @@
       <!-- PERFORM -->
       <div class="tabpane" data-pane="perform" id="pane-perform" role="tabpanel" aria-labelledby="tab-perform" hidden>
         <h2>Perform</h2>
-        <p class="muted">Dance a saved move and its word appears over your head and joins the sentence. Holding a pose for half a second counts too. <b>Keep at least one hand in view.</b></p>
+        <p id="performState" class="teach-hint" aria-live="polite"><b>Watching.</b> Dance one of your moves.</p>
+        <p class="muted">Holding a pose for half a second counts too. <b>Keep at least one hand in view.</b></p>
 
         <div id="warmupOffer" class="warmup" hidden>
           <span>Warm up first? Dance each of your moves once, with counts, before matching starts.</span>
@@ -134,9 +135,8 @@
         <div class="performable">
           <h3>Your moves</h3>
           <div id="performList" class="chips" aria-live="polite"></div>
+          <small class="muted">Forgot one? Tap a word and its ghost dances the move; tap again to stop.</small>
         </div>
-
-        <p id="performState" class="teach-hint" aria-live="polite"><b>Watching.</b> Dance one of your moves.</p>
 
         <div class="transcript-head">
           <h3>Sentence</h3>
@@ -163,7 +163,7 @@
         </details>
 
         <details class="more">
-          <summary>Tuning</summary>
+          <summary>Tuning (how strict matching is)</summary>
           <label class="field">
             <span>Matching <em id="threshVal"></em></span>
             <input id="thresh" type="range" min="0.4" max="0.94" step="0.01" value="0.72" />
