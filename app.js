@@ -4536,8 +4536,12 @@ const tutBackBtn = document.getElementById("tutBack");
 const tutNextBtn = document.getElementById("tutNext");
 const tutExitBtn = document.getElementById("tutExit");
 const TUT_STEPS = [
-  { phase: "Teach", tab: "teach", on: "tracked",
-    text: "First, the camera needs to see you. Step back until ink discs are printed on your head, shoulders and hands." },
+  // manual: the tracker CONFIRMS on the card instead of advancing it. Jumping
+  // to the next card the moment tracking settled yanked the guide away from a
+  // visitor who had just started reading (most people are already in view).
+  { phase: "Teach", tab: "teach", on: "tracked", manual: true,
+    doneText: "That's it, the discs are on you. Click Next to continue.",
+    text: "First, the camera needs to see you. Step back until ink discs are printed on your head, shoulders and hands, then click Next." },
   { phase: "Teach", tab: "teach", on: null, demo: true,
     text: "The dictionary already holds one move, called AlgoDance: the printed ghost is dancing it now. Both arms sweep up overhead and back down, in four counts. Dance along! You'll teach your own move the same way." },
   { phase: "Teach", tab: "teach", on: "word",
@@ -4619,6 +4623,7 @@ function tutAdvance() {
   tut.i++;
   tut.unlocked = false;
   tut.failed = 0;
+  tut.confirmed = false;
   tutShow();
 }
 function tutBack() {
@@ -4626,6 +4631,7 @@ function tutBack() {
   tut.i--;
   tut.unlocked = false;
   tut.failed = 0;
+  tut.confirmed = false;
   tutShow();
 }
 function endTutorial() {
@@ -4641,6 +4647,17 @@ function endTutorial() {
 }
 function tutNotify(ev) {
   if (!tut || TUT_STEPS[tut.i].on !== ev) return;
+  const s = TUT_STEPS[tut.i];
+  if (s.manual) {
+    // The event only confirms the step was done; moving on stays the
+    // visitor's click. Written once (the tracker poller repeats the event).
+    if (!tut.confirmed) {
+      tut.confirmed = true;
+      tutLockEl.hidden = false;
+      tutLockEl.textContent = s.doneText || "";
+    }
+    return;
+  }
   const waited = performance.now() - tut.shownAt;
   if (waited >= TUT_MIN_READ_MS) { tutAdvance(); return; }
   // Done before the step could be read: advance once it has been up long

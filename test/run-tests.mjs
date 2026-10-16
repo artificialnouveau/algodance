@@ -99,6 +99,8 @@ globalThis.__T = {
   overlay, wordInput, teachMsg, recordBtn, statusEl, threshInput, teachHint,
   startTeach, teachStep, updateHandsOnFace, clearHandsOnFace, handOnFace, isNearFace,
   updateTeachUI, cancelTeach,
+  get tut() { return tut; },
+  startTutorial, endTutorial, tutNotify, tutLockEl, tutNextBtn,
   updateCaptureOverlay, countLabel, bigStatus, stripIndices, pbTempo, judgeBeat,
   pickMainPose, smoothPose, drawPresence, resampleSeq, migrateSq, dtw, poseDist,
   trimStillEnds, trimLeadIn, travelOf, thresholdFor, recomputeWordStats,
@@ -507,6 +509,20 @@ console.log("T14: the panel hint follows the teach state instead of saying Ready
   check("capturing hint asks for the LEFT hand", T.teachHint.innerHTML.includes("LEFT"));
   T.cancelTeach();
   check("cancel restores the Ready hint", T.teachHint.innerHTML.includes("Ready"));
+}
+
+console.log("T15: guide step 1 confirms tracking on the card instead of auto-advancing");
+{
+  T.startTutorial();
+  check("guide opens on step 1", T.tut && T.tut.i === 0);
+  check("Next is enabled from the start", T.tutNextBtn.disabled === false);
+  T.tutNotify("tracked");
+  T.tutNotify("tracked"); // the poller repeats the event; the card confirms once
+  check("tracked does not advance the step", T.tut && T.tut.i === 0);
+  check("the card confirms and points at Next",
+    T.tutLockEl.hidden === false && /Next/.test(T.tutLockEl.textContent || ""));
+  T.endTutorial();
+  check("guide closed", T.tut === null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
