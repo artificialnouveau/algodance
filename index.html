@@ -135,7 +135,10 @@
         <div class="performable">
           <h3>Your moves</h3>
           <div id="performList" class="chips" aria-live="polite"></div>
-          <small class="muted">Forgot one? Tap a word and its ghost dances the move; tap again to stop.</small>
+          <div class="row-actions">
+            <button id="inspireBtn" class="btn ghost small" title="Play a random move's ghost to dance along with">Surprise me</button>
+          </div>
+          <small class="muted">Forgot one? Tap a word and its ghost dances the move; tap again to stop. Surprise me picks one for you.</small>
         </div>
 
         <div class="transcript-head">
@@ -175,9 +178,9 @@
             <span>Trigger</span>
             <select id="triggerMode">
               <option value="auto">Continuous (watch and match automatically)</option>
-              <option value="manual">Manual (button or Spacebar starts and stops)</option>
+              <option value="manual">Manual (press a button instead of camera gestures)</option>
             </select>
-            <small class="muted">Manual captures between one press (start) and the next (stop) of the button or Spacebar, so your hands are free while you dance.</small>
+            <small class="muted">An accessibility fallback for when the camera gestures do not work for you: one press of the button or Spacebar starts a capture, the next stops it, here and in Teach (where it replaces the R and L face covers). Most people never need it.</small>
           </label>
           <button id="holdBtn" class="btn block" hidden>Start capture (or Space)</button>
 
@@ -370,6 +373,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=87"></script>
+  <script type="module" src="app.js?v=88"></script>
 </body>
 </html>

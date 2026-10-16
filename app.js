@@ -4997,6 +4997,43 @@ setInterval(() => {
 }, 5000);
 window.addEventListener("pointerdown", () => { lastActivityAt = performance.now(); });
 
+// ---------- Inspiration ----------
+// "Which move was mine again?" is the commonest stall on Perform: the moves
+// are the visitor's own words, easily forgotten. Surprise me cues a random
+// saved move's ghost to dance along with, and after a quiet half-minute with
+// a body in frame a scrap suggests one by name, unprompted.
+const inspireBtn = document.getElementById("inspireBtn");
+function randomPerformWord() {
+  const words = [], seen = new Set();
+  for (const t of matchPool()) {
+    const k = t.word.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); words.push(t.word); }
+  }
+  return words.length ? words[Math.floor(Math.random() * words.length)] : null;
+}
+if (inspireBtn) inspireBtn.addEventListener("click", () => {
+  const w = randomPerformWord();
+  if (w) startPlayback(w);
+});
+let inspireArmedAt = 0, inspireLastAt = 0;
+setInterval(() => {
+  const now = performance.now();
+  // Only an unbroken quiet stretch ON Perform, with someone visibly there,
+  // arms the nudge; an empty room is the attract loop's job, not this one's.
+  if (!ready || currentTab !== "perform" || triggerMode === "manual"
+    || playback || teach || bgCapture || !(liveLmsNow && now - liveLmsNow.at < 1000)) {
+    inspireArmedAt = now;
+    return;
+  }
+  if (now - inspireArmedAt < 30000) return;
+  if (now - Math.max(lastActivityAt, lastFireAt) < 30000) return;
+  if (now - inspireLastAt < 60000) return;
+  const w = randomPerformWord();
+  if (!w) return;
+  inspireLastAt = now;
+  showMissScrap(`Stuck? Try “${w}”. Tap its chip, or Surprise me, to watch the ghost.`);
+}, 5000);
+
 // Hands-only word picking (word labels drawn on the video with dwell-to-pick)
 // was tried and removed: labels floating on the stream read as clutter.
 // Reusing a word stays easy through the input's autocomplete list and the
