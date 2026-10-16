@@ -309,6 +309,18 @@ const UNSEEN_STICKY_MS = 600;
 // countdown partway through. Outside a hold the short window still applies,
 // so a hallucinated latch cannot park a phantom hand on the face for long.
 const HOLD_UNSEEN_STICKY_MS = 4500;
+// A covering palm does not always LOWER the wrist's visibility: the model
+// often keeps reporting the hidden wrist confidently, at a wrong spot near
+// the visible elbow or shoulder (seen with a far, backlit subject). That
+// "seen away from the face" evidence released the latch and canceled the
+// countdown mid-hold. So while the acting hand is mid-hold, release takes
+// stronger evidence: the wrist must be seen CLEARLY (not just above the
+// detection floor), outside WIDER radii, for LONGER. A real uncover (the
+// hand swinging down in plain view) still releases, about 0.2s slower.
+const HOLD_SEEN_VIS = 0.5;
+const HOLD_REST_EXIT = 1.0;
+const HOLD_CENTER_X_EXIT = 0.8;
+const HOLD_RELEASE_DEBOUNCE = 12;
 // The covering palm hides the very landmarks that detect it: nose/ears drop
 // out as the hand arrives, which used to stall the countdown for seconds.
 // The face anchor therefore survives brief occlusion (the head does not move
@@ -374,20 +386,27 @@ function updateHandsOnFace(lms, now) {
   // (prime/starting), the LEFT hand stops one (capturing). That hand's unseen
   // window is stretched past the full countdown; the other keeps the short one.
   const inTeach = teach && !teach.manual;
-  const rStick = inTeach && (teach.state === "prime" || teach.state === "starting")
-    ? HOLD_UNSEEN_STICKY_MS : UNSEEN_STICKY_MS;
-  const lStick = inTeach && teach.state === "capturing"
-    ? HOLD_UNSEEN_STICKY_MS : UNSEEN_STICKY_MS;
-  const check = (w, e, st, stick) => {
-    const rThr = st.on ? REST_EXIT : REST_ENTER;
-    const xThr = st.on ? CENTER_X_EXIT : CENTER_X_ENTER;
+  const rHold = inTeach && (teach.state === "prime" || teach.state === "starting");
+  const lHold = inTeach && teach.state === "capturing";
+  const check = (w, e, st, hold) => {
+    const stick = hold ? HOLD_UNSEEN_STICKY_MS : UNSEEN_STICKY_MS;
+    // During a hold, a LATCHED wrist only counts as seen when the model is
+    // confident about it; a half-confident wrist is treated as unseen so a
+    // hallucinated position cannot release the latch. Entering is unchanged.
+    const seenThr = st.on && hold ? HOLD_SEEN_VIS : 0.15;
+    const rThr = st.on ? (hold ? HOLD_REST_EXIT : REST_EXIT) : REST_ENTER;
+    const xThr = st.on ? (hold ? HOLD_CENTER_X_EXIT : CENTER_X_EXIT) : CENTER_X_ENTER;
     const upThr = st.on ? 0.08 : 0.2; // (elbow.y - wrist.y) in shoulder widths
     let inRange = false, d = Infinity;
-    if ((w?.visibility ?? 0) > 0.15) {
+    if ((w?.visibility ?? 0) > seenThr) {
       st.unseenSince = 0;
       d = Math.hypot(w.x - anchor.x, w.y - anchor.y) / scale;
       const dx = Math.abs(w.x - anchor.x) / scale;
-      const forearmUp = (e?.visibility ?? 0) <= 0.2 || (e.y - w.y) / scale > upThr;
+      // The forearm-up gate guards against false ENTERS (crossed arms); for a
+      // hand already latched mid-hold it is only another way for a garbage
+      // elbow estimate to cancel the countdown, so it is skipped there.
+      const forearmUp = (st.on && hold) ||
+        (e?.visibility ?? 0) <= 0.2 || (e.y - w.y) / scale > upThr;
       inRange = d < rThr && dx < xThr && forearmUp;
     } else if (st.on) {
       if (!st.unseenSince) st.unseenSince = now;
@@ -395,14 +414,15 @@ function updateHandsOnFace(lms, now) {
     }
     if (inRange !== st.on) {
       st.streak++;
-      if (st.streak >= (st.on ? REST_RELEASE_DEBOUNCE : REST_DEBOUNCE)) { st.on = inRange; st.streak = 0; }
+      const need = st.on ? (hold ? HOLD_RELEASE_DEBOUNCE : REST_RELEASE_DEBOUNCE) : REST_DEBOUNCE;
+      if (st.streak >= need) { st.on = inRange; st.streak = 0; }
     } else {
       st.streak = 0;
     }
     return d;
   };
-  const dL = check(lms[15], lms[13], handOnFace.left, lStick);
-  const dR = check(lms[16], lms[14], handOnFace.right, rStick);
+  const dL = check(lms[15], lms[13], handOnFace.left, lHold);
+  const dR = check(lms[16], lms[14], handOnFace.right, rHold);
   restInfo = { anchor, scale, d: Math.min(dL, dR), on: handOnFace.left.on || handOnFace.right.on };
   return { left: handOnFace.left.on, right: handOnFace.right.on };
 }

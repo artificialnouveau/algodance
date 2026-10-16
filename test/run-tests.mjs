@@ -525,5 +525,48 @@ console.log("T15: guide step 1 confirms tracking on the card instead of auto-adv
   check("guide closed", T.tut === null);
 }
 
+console.log("T16: a confidently misplaced wrist cannot cancel an active hold");
+{
+  // The IMG_3167 failure: the palm is on the face, but the model keeps
+  // reporting the hidden wrist CONFIDENTLY beside the head. That used to be
+  // "seen away" evidence and released the latch mid-countdown.
+  T.clearHandsOnFace();
+  T.wordInput.value = "halluc";
+  T.startTeach();
+  let now = performance.now() + 240000;
+  const vecAt = (w) => { const v = new Array(66).fill(0); v[30] = w; v[31] = -w; return v; };
+  const step = (lms, vec) => {
+    const h = T.updateHandsOnFace(lms, now);
+    if (T.teach) T.teachStep(vec, h, T.isNearFace(), now, true);
+    now += 33;
+    return h;
+  };
+  const coverR = standing();
+  coverR[16] = { x: 0.5, y: 0.35, visibility: 0.9 };
+  coverR[14] = { x: 0.5, y: 0.52, visibility: 0.9 };
+  const hallucR = standing();
+  hallucR[16] = { x: 0.64, y: 0.42, visibility: 0.9 }; // beside the head, high vis
+  hallucR[14] = { x: 0.62, y: 0.55, visibility: 0.9 }; // garbage elbow too
+  for (let i = 0; i < 5; i++) step(standing(), vecAt(0));
+  for (let i = 0; i < 20; i++) step(coverR, vecAt(0));
+  check("cover starts the countdown", T.teach && T.teach.state === "starting");
+  let held = true;
+  for (let i = 0; i < 100 && T.teach && T.teach.state === "starting"; i++) {
+    const h = step(hallucR, vecAt(0));
+    if (T.teach.state === "starting" && !h.right) held = false;
+  }
+  check("misplaced wrist does not break the start hold", held);
+  check("the hold still begins the capture", T.teach && T.teach.state === "capturing");
+  // Once the capture is running the right hand is no longer the acting hand,
+  // so the SAME wrong wrist releases it at the normal pace.
+  for (let i = 0; i < 10; i++) step(hallucR, vecAt(0.4));
+  check("outside its hold the same wrist releases normally", !T.handOnFace.right.on);
+  // A real uncover during a hold still cancels: wrist clearly seen far away.
+  for (let i = 0; i < 20; i++) step(standing(), vecAt(0.6));
+  for (let i = 0; i < 20; i++) step(coverR, vecAt(0.8)); // right hand back on face
+  check("no restart from the right hand mid-capture", T.teach && T.teach.state === "capturing");
+  T.cancelTeach();
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
