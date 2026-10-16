@@ -821,22 +821,6 @@ select {
 .btn.ghost { background: transparent; box-shadow: none; border-style: dashed; }
 .btn.danger { color: var(--warn); border-color: var(--ink); }
 
-.meter { background: var(--paper-3); border: 1.5px solid var(--ink); border-radius: 0; padding: 12px; margin: 14px 0; box-shadow: var(--lift-1); }
-.meter-row span { font-family: var(--font-hand); }
-.meter-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
-.meter-row b { color: var(--text); }
-.bar { height: 8px; background: #000; border-radius: var(--r-xs); overflow: hidden; margin-top: 8px; }
-/* Driven from JS by --fill (0..1) as a scaleX, NOT width: this updates on every
-   detection frame, and animating width relayouts the panel each time. */
-.bar-fill {
-  height: 100%;
-  width: 100%;
-  background: var(--grad);
-  transform: scaleX(var(--fill, 0));
-  transform-origin: left center;
-  transition: transform var(--dur-1) linear;
-}
-
 /* The heading and its buttons share a row when they fit; when they don't,
    the buttons drop to their OWN line (nowrap inside, wrap outside) instead
    of folding one button onto the heading's underline. */
@@ -866,6 +850,17 @@ select {
 }
 .phrase .chip:nth-child(2n) { transform: rotate(-1.6deg); }
 .phrase .chip:nth-child(3n) { transform: rotate(1.4deg); }
+/* The word that just landed slaps down onto the sentence, so the moment of
+   arrival is visible from across the room. */
+.phrase .chip.new, .kiosk-phrase .chip.new { animation: chip-land 0.7s ease-out; }
+@keyframes chip-land {
+  0% { transform: scale(2.2) rotate(-4deg); opacity: 0; }
+  55% { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .phrase .chip.new, .kiosk-phrase .chip.new { animation: none; }
+}
 
 .teach-msg { min-height: 20px; margin-top: 10px; }
 .teach-msg.ok { color: var(--ok); font-family: var(--font-hand); font-weight: 700; }
@@ -941,7 +936,7 @@ input:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   .big-status.rec { animation: none; }
   .dance-count.tick { animation: none; }
-  .big-word, .big-status, .bar-fill { transition: none; }
+  .big-word, .big-status { transition: none; }
   .video-wrap.riso .grain { animation: none; }
   .video-wrap.riso.flash #video { animation: none; }
   #zineCanvas.flip-right, #zineCanvas.flip-left { animation: none; }

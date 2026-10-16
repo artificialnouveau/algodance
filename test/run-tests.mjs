@@ -568,5 +568,17 @@ console.log("T16: a confidently misplaced wrist cannot cancel an active hold");
   T.cancelTeach();
 }
 
+console.log("T17: the tuning slider stores match strength, closer to 1 is strict");
+{
+  T.threshInput.value = "0.72";
+  check("0.72 match maps to the old 0.28 distance default",
+    Math.abs(T.thresholdFor("nosuchword") - 0.28) < 1e-9);
+  T.threshInput.value = "0.94";
+  const strict = T.thresholdFor("nosuchword");
+  T.threshInput.value = "0.4";
+  const loose = T.thresholdFor("nosuchword");
+  check("higher slider value allows less distance", strict < loose, strict + " vs " + loose);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -6,7 +6,7 @@
   <title>AlgoDance: Code a movement</title>
   <link rel="preload" href="fonts/bodoni-moda-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/courier-prime-latin-400.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="style.css?v=86" />
+  <link rel="stylesheet" href="style.css?v=87" />
 </head>
 <body>
   <!-- Collage furniture: printer's crop marks and a registration target, the
@@ -136,11 +136,7 @@
           <div id="performList" class="chips" aria-live="polite"></div>
         </div>
 
-        <div class="meter">
-          <div class="meter-row"><span>Closest move</span><b id="bestWord">—</b></div>
-          <div class="meter-row"><span>Match strength</span><b id="matchPct">—</b></div>
-          <div class="bar"><div id="bar" class="bar-fill"></div></div>
-        </div>
+        <p id="performState" class="teach-hint" aria-live="polite"><b>Watching.</b> Dance one of your moves.</p>
 
         <div class="transcript-head">
           <h3>Sentence</h3>
@@ -150,11 +146,11 @@
             <button id="clearPhrase" class="btn ghost small" title="Empty the sentence and start again">Clear</button>
           </div>
         </div>
-        <small class="muted">Each performed word lands here, building a sentence.</small>
+        <small class="muted">Every move the app recognizes drops its word here, building a sentence as you dance.</small>
         <div id="phrase" class="phrase" aria-live="polite"></div>
 
         <details class="more">
-          <summary>Routine</summary>
+          <summary>Routine (practice a choreography)</summary>
           <div class="routine">
             <div id="routineList" class="chips"></div>
             <div class="row-actions">
@@ -162,7 +158,7 @@
               <button id="routineStart" class="btn small">Start routine</button>
               <button id="routineClear" class="btn ghost small">Clear</button>
             </div>
-            <small class="muted">Chain moves into a choreography: each one is cued by name, counted in, performed from memory, and scored.</small>
+            <small class="muted">A practice drill, separate from the sentence: pick moves, press Start, and the app cues each one by name, counts you in, and scores it. The sentence above grows on its own while you dance freely.</small>
           </div>
         </details>
 
@@ -170,8 +166,8 @@
           <summary>Tuning</summary>
           <label class="field">
             <span>Matching <em id="threshVal"></em></span>
-            <input id="thresh" type="range" min="0.06" max="0.6" step="0.01" value="0.28" />
-            <div class="range-ends" aria-hidden="true"><i>strict</i><i>loose</i></div>
+            <input id="thresh" type="range" min="0.4" max="0.94" step="0.01" value="0.72" />
+            <div class="range-ends" aria-hidden="true"><i>loose</i><i>strict</i></div>
             <small class="muted">Strict fires fewer, surer matches. Words with several takes calibrate themselves; this scales that.</small>
           </label>
 
@@ -179,20 +175,16 @@
             <span>Trigger</span>
             <select id="triggerMode">
               <option value="auto">Continuous (watch and match automatically)</option>
-              <option value="manual">Manual (hold the button or Spacebar)</option>
+              <option value="manual">Manual (button or Spacebar starts and stops)</option>
             </select>
-            <small class="muted">Manual captures only while you hold the button or Spacebar.</small>
+            <small class="muted">Manual captures between one press (start) and the next (stop) of the button or Spacebar, so your hands are free while you dance.</small>
           </label>
-          <button id="holdBtn" class="btn block" hidden>Hold to capture (or Space)</button>
+          <button id="holdBtn" class="btn block" hidden>Start capture (or Space)</button>
 
           <label class="check"><input type="checkbox" id="soundToggle" checked /> Ping on match</label>
           <label class="check"><input type="checkbox" id="speakToggle" checked /> Speak matched words aloud</label>
         </details>
 
-        <details class="diag">
-          <summary>Match diagnosis</summary>
-          <pre id="diagBox">Perform something and every decision shows up here: what matched, what was rejected, and by which rule.</pre>
-        </details>
       </div>
 
       <!-- HOW IT WORKS: the opening page for visitors with nobody to explain.
@@ -378,6 +370,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=86"></script>
+  <script type="module" src="app.js?v=87"></script>
 </body>
 </html>

@@ -66,21 +66,16 @@ const routineClearBtn = document.getElementById("routineClear");
 
 const threshInput = document.getElementById("thresh");
 const threshVal = document.getElementById("threshVal");
-const bestWordEl = document.getElementById("bestWord");
-const matchPctEl = document.getElementById("matchPct");
-const barEl = document.getElementById("bar");
-// The match bar is redrawn on every detection frame. Writing `width` relayouts
-// the whole panel each time (and restarts a transition that never finishes), so
-// the fill is a composited scaleX driven by one custom property instead.
-let barPct = -1;
-function setBar(pct) {
-  const v = Math.max(0, Math.min(100, pct));
-  // The sub-pixel guard must not swallow a reset, or the bar keeps a sliver of
-  // fill after being cleared.
-  if (v !== 0 && Math.abs(v - barPct) < 0.5) return;
-  if (v === barPct) return;
-  barPct = v;
-  barEl.style.setProperty("--fill", (v / 100).toFixed(3));
+// The panel's Perform state line. The old numeric meter here (closest move /
+// match strength / bar) confused more than it helped: live scores are mostly
+// zero between moves, which read as "broken". Near-miss coaching lives on the
+// video (closestHint); the panel line now just says what Perform is doing.
+const performStateEl = document.getElementById("performState");
+let performStateHtml = "";
+function setPerformPanel(html) {
+  if (html === performStateHtml || !performStateEl) return;
+  performStateHtml = html;
+  performStateEl.innerHTML = html;
 }
 const performListEl = document.getElementById("performList");
 const closestHintEl = document.getElementById("closestHint");
@@ -1801,7 +1796,6 @@ async function runFrame() {
             perfHandsLost = false;
           } else if ((!handsOk || lowLight) && !perfHandsLost) {
             perfHandsLost = true;
-            setBar(0);
             hideClosest();
             statusEl.textContent = lowLight
               ? "Too dark to track reliably. Matching is paused; add light."
@@ -2130,10 +2124,7 @@ const DEV_RATIO_MIN = 0.5; // live excursion must be at least half the code's
 // tracker barely saw during the segment.
 function scoreSegment(frames, conf) {
   const pool = matchPool();
-  if (pool.length === 0) {
-    bestWordEl.textContent = templates.length ? "none for this algorithm" : "none yet";
-    return null;
-  }
+  if (pool.length === 0) return null; // setPerformState names the no-codes case
   if (frames.length < MIN_SEG_FRAMES) return null;
   const live = resampleSeq(frames, FIXED_LEN);
   const eLive = seqEnergy(live);
@@ -2151,14 +2142,11 @@ function scoreSegment(frames, conf) {
   return [...perWord.values()].sort((a, b) => a.dist - b.dist);
 }
 
-// Update the meter/closest hint from a ranked list; returns the top comparison.
+// Update the closest hint from a ranked list; returns the top comparison.
 function showScore(ranked) {
   const best = ranked[0], second = ranked[1];
   const thresh = thresholdFor(best.word);
   const pct = Math.max(0, Math.min(100, (1 - best.dist / thresh) * 100));
-  bestWordEl.textContent = best.word;
-  matchPctEl.textContent = Math.round(pct) + "%";
-  setBar(pct);
   if (pct >= 25) showClosest(best.word, pct); else hideClosest();
   return { best, second, thresh };
 }
@@ -2206,9 +2194,6 @@ function holdStep(vec, now, face, conf) {
   const best = ranked[0], second = ranked[1];
   const thresh = thresholdFor(best.word);
   const pct = Math.max(0, Math.min(100, (1 - best.dist / thresh) * 100));
-  bestWordEl.textContent = best.word;
-  matchPctEl.textContent = Math.round(pct) + "%";
-  setBar(pct);
   if (pct >= 25) showClosest(best.word, pct);
   const ambiguous = second && (second.dist - best.dist) < AMBIG_GAP_FRAC * thresh;
   // The held pose must resemble the word MORE than the user's own calibrated
@@ -2255,7 +2240,6 @@ function performStep(vec, now, face, conf) {
     if (sp > MOVE_START) {
       moving = true; moveStart = now - SPEED_WIN_MS; lastActive = now;
     } else if (!holding) {
-      setBar(0);
       hideClosest();
     }
     return;
@@ -2282,7 +2266,6 @@ function performStep(vec, now, face, conf) {
       if (inProgress) showScore(inProgress);
     }
   } else if (!holding) {
-    setBar(0);
     hideClosest();
   }
 
@@ -2301,7 +2284,7 @@ function performStep(vec, now, face, conf) {
     fs.tailOn || fs.frac > 0.3 ? "reads as a hand-to-face rest gesture" : null;
   if (gate) {
     diag(`move rejected: ${gate}`);
-    setBar(0); hideClosest(); return;
+    hideClosest(); return;
   }
   let ranked = scoreSegment(segFrames, confInRange(moveStart, lastActive));
   let chosen = segFrames;
@@ -2336,7 +2319,6 @@ function performStep(vec, now, face, conf) {
   }
   if (!ranked) {
     diag("move rejected: no code with comparable energy/excursion");
-    setBar(0);
     showMissScrap("Saw that. Nothing matched yet; make your move bigger and sharper.");
     return;
   }
@@ -2518,7 +2500,10 @@ function recomputeWordStats() {
 // move: 0.42, or 0.35 for single-example words, even with the slider maxed),
 // and never beyond CROSS_WORD_FRAC of the gap to the nearest other word.
 function thresholdFor(word) {
-  const base = parseFloat(threshInput.value);
+  // The slider stores "required match" (closer to 1 is stricter, like the
+  // match percentages people see); the matcher works in DTW distance, so it
+  // is inverted here. 0.72 on the slider is the old 0.28 default distance.
+  const base = 1 - parseFloat(threshInput.value);
   const s = wordStats.get(word.toLowerCase());
   let t = s?.auto == null
     ? Math.min(base, 0.35)
@@ -2531,10 +2516,7 @@ function matchAndFire(frames, now) {
   // Only compare against codes taught with the current algorithm family; the
   // three algorithms do not agree on scale, so cross-family matching is noise.
   const pool = matchPool();
-  if (pool.length === 0) {
-    bestWordEl.textContent = templates.length ? "no codes for this algorithm" : "no codes yet";
-    return;
-  }
+  if (pool.length === 0) return; // setPerformState names the no-codes case
   const live = resampleSeq(frames, FIXED_LEN);
   const eLive = seqEnergy(live);
   const devLive = devOfSeq(live);
@@ -2549,9 +2531,7 @@ function matchAndFire(frames, now) {
     if (!perWord.has(k) || d < perWord.get(k).dist) perWord.set(k, { word: t.word, dist: d });
   }
   if (perWord.size === 0) {
-    bestWordEl.textContent = "—";
-    matchPctEl.textContent = "—";
-    setBar(0);
+    showMissScrap("Saw that. Nothing matched yet; make your move bigger and sharper.");
     return;
   }
   const ranked = [...perWord.values()].sort((a, b) => a.dist - b.dist);
@@ -2559,15 +2539,16 @@ function matchAndFire(frames, now) {
   const thresh = thresholdFor(best.word);
 
   const pct = isFinite(best.dist) ? Math.max(0, Math.min(100, (1 - best.dist / thresh) * 100)) : 0;
-  bestWordEl.textContent = best.word ?? "—";
-  matchPctEl.textContent = Math.round(pct) + "%";
-  setBar(pct);
-
   // Ambiguous when a different word is nearly as close: skip rather than guess.
   const ambiguous = second && (second.dist - best.dist) < AMBIG_GAP_FRAC * thresh;
   if (best.dist < thresh * FIRE_MARGIN && !ambiguous) {
     const ok = best.word !== lastFiredWord || now - lastFireAt > COOLDOWN_MS;
     if (ok) fireWord(best.word, now);
+  } else if (pct >= 25) {
+    // A deliberate capture that did not fire still deserves an answer.
+    showClosest(best.word, pct);
+  } else {
+    showMissScrap(`Saw that. Closest was “${best.word}” but far off; exaggerate the move.`);
   }
 }
 
@@ -2713,23 +2694,34 @@ if (cutoutToggle) {
   });
 }
 
-// Status text under the video, per tab. Only Perform "watches".
+// Status text under the video, per tab, plus the Perform panel's state line.
+// Only Perform "watches".
 function setPerformState() {
   if (!ready) return;
-  if (currentTab === "teach") {
+  if (currentTab !== "perform") {
     // The instruction for teaching lives in the Teach panel, above the field it
     // is telling you to fill in; the status bar just reports state.
     statusEl.textContent = "● Ready.";
     return;
   }
-  if (currentTab !== "perform") {
-    statusEl.textContent = "● Ready.";
+  if (matchPool().length === 0) {
+    setPerformPanel(templates.length
+      ? "<b>No moves for this algorithm.</b> Switch the algorithm back, or teach new ones."
+      : "<b>No moves yet.</b> Go to Teach and record one first.");
+    statusEl.textContent = "● Nothing to match yet. Teach a move first.";
     return;
   }
   if (triggerMode === "manual") {
-    statusEl.textContent = manualCapturing ? "● Capturing movement…" : "● Ready. Hold the button to capture.";
+    if (manualCapturing) {
+      setPerformPanel("<b>Capturing…</b> dance your move, then press the button or Space to stop.");
+      statusEl.textContent = "● Capturing movement… press the button or Space to stop.";
+    } else {
+      setPerformPanel("<b>Ready.</b> Press the button or Space, dance your move, then press again.");
+      statusEl.textContent = "● Ready. Press the button or Space to start capturing.";
+    }
     return;
   }
+  setPerformPanel("<b>Watching.</b> Dance one of your saved moves; when one is recognized, its word appears over your head and joins the sentence.");
   statusEl.textContent = "● Watching. Perform a saved move and its word will appear.";
 }
 
@@ -2746,7 +2738,7 @@ function fireWord(word, now) {
   };
   if (!speak(word, reveal)) reveal(); // speech off or unavailable: show now
   phrase.push(word);
-  renderPhrase();
+  renderPhrase(true);
   tutNotify("performed");
 }
 
@@ -2794,21 +2786,34 @@ function ping() {
 }
 
 // ---------- Manual capture (accessibility fallback) ----------
+// Press once to start, press again to stop: a HOLD of the button or Spacebar
+// pinned one hand for the whole move, which made dancing the move impossible.
+const HOLD_BTN_IDLE = "Start capture (or Space)";
+const HOLD_BTN_REC = "Stop capture (or Space)";
 function startManual() {
   if (teach || triggerMode !== "manual" || manualCapturing) return;
   manualCapturing = true;
   manualFrames = [];
   setPerformState();
   holdBtn.classList.add("recording");
+  holdBtn.textContent = HOLD_BTN_REC;
 }
 function stopManual() {
   if (!manualCapturing) return;
   manualCapturing = false;
   holdBtn.classList.remove("recording");
+  holdBtn.textContent = HOLD_BTN_IDLE;
   setPerformState();
   const frames = manualFrames;
   manualFrames = [];
   if (frames.length >= MIN_SEG_FRAMES) matchAndFire(frames, performance.now());
+}
+// Abandon a capture without matching it (tab switches, mode switches).
+function cancelManual() {
+  manualCapturing = false;
+  manualFrames = [];
+  holdBtn.classList.remove("recording");
+  holdBtn.textContent = HOLD_BTN_IDLE;
 }
 
 // Last known head position, in percent of the video box. Updated every tracked
@@ -2911,8 +2916,10 @@ function updateCaptureOverlay(now) {
   else if (kind === "stop") statusEl.textContent = `Hold… saving in ${secs}`;
 }
 
-function renderPhrase() {
-  const chips = phrase.map((w) => `<span class="chip">${escapeHtml(w)}</span>`).join("");
+function renderPhrase(justAdded) {
+  // The newest chip pops so it is obvious WHEN a word landed in the sentence.
+  const chips = phrase.map((w, i) =>
+    `<span class="chip${justAdded && i === phrase.length - 1 ? " new" : ""}">${escapeHtml(w)}</span>`).join("");
   phraseEl.innerHTML = phrase.length === 0
     ? '<span class="muted">Empty. Perform one of your codes and its word or phrase lands here.</span>'
     : chips;
@@ -3983,6 +3990,7 @@ function drawPlayback(now) {
 // ---------- Codes list ----------
 function renderCodeList() {
   renderPerformable(); // keep the Perform tab's code list in sync
+  setPerformState();   // and the panel's no-moves state line with it
   // Group templates by word (case-insensitive); each word can hold many examples.
   const groups = new Map();
   for (const t of templates) {
@@ -4509,7 +4517,7 @@ function activateTab(tab, focus = false) {
   // never keep "recording" (REC) into Perform. Also drop any manual capture.
   if (teach && name !== "teach") cancelTeach();
   if (bgCapture && name !== "perform") { bgCapture = null; bgBtn.disabled = false; }
-  manualCapturing = false;
+  cancelManual();
   // These latch "the warning is already on screen". activateTab overwrites the
   // status line, so leaving them set meant the warning could never be shown
   // again after a tab round trip, even with the hands still out of frame.
@@ -4517,7 +4525,6 @@ function activateTab(tab, focus = false) {
   teachHandsLost = false;
   moving = false; // drop any half-finished Perform move
   hideClosest();
-  setBar(0);
   updatePbControls(); // the practice strip only shows on Perform
   // First Perform visit each session: offer a warm-up run of your codes.
   if (name === "perform" && !warmupOffered) {
@@ -4728,7 +4735,7 @@ clearPhraseBtn.addEventListener("click", () => { phrase = []; renderPhrase(); })
 triggerModeSel.addEventListener("change", () => {
   triggerMode = triggerModeSel.value;
   holdBtn.hidden = triggerMode !== "manual";
-  manualCapturing = false;
+  cancelManual();
   moving = false;
   setPerformState();
   syncManualHint();
@@ -4805,22 +4812,19 @@ modelSel.addEventListener("change", async () => {
   switchAlgo(next);
 });
 
-// Hold-to-capture: pointer (mouse/touch)
-holdBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); startManual(); });
-holdBtn.addEventListener("pointerup", stopManual);
-holdBtn.addEventListener("pointerleave", stopManual);
-holdBtn.addEventListener("pointercancel", stopManual);
+// Press-to-toggle capture: button (mouse/touch)
+const toggleManual = () => { if (manualCapturing) stopManual(); else startManual(); };
+holdBtn.addEventListener("click", toggleManual);
 
-// Hold-to-capture: Spacebar (manual mode, not while typing)
+// Press-to-toggle capture: Spacebar (manual mode, not while typing). The
+// keydown preventDefault also suppresses the button's own native Space
+// activation while it is focused, so a press never toggles twice.
 window.addEventListener("keydown", (e) => {
-  if (e.code !== "Space" || triggerMode !== "manual") return;
+  if (e.code !== "Space" || triggerMode !== "manual" || e.repeat) return;
   const tag = (e.target.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea" || tag === "select") return;
   e.preventDefault();
-  if (!e.repeat) startManual();
-});
-window.addEventListener("keyup", (e) => {
-  if (e.code === "Space" && triggerMode === "manual") { e.preventDefault(); stopManual(); }
+  toggleManual();
 });
 
 // ---------- In-world dialogs ----------
