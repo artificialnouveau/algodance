@@ -98,7 +98,7 @@ globalThis.__T = {
   get markPos() { return markPos; },
   overlay, wordInput, teachMsg, recordBtn, statusEl, threshInput,
   startTeach, teachStep, updateHandsOnFace, clearHandsOnFace, handOnFace, isNearFace,
-  updateCaptureOverlay, countLabel, bigStatus,
+  updateCaptureOverlay, countLabel, bigStatus, stripIndices, pbTempo, judgeBeat,
   pickMainPose, smoothPose, drawPresence, resampleSeq, migrateSq, dtw, poseDist,
   trimStillEnds, trimLeadIn, travelOf, thresholdFor, recomputeWordStats,
   setLowLight, lightNote,
@@ -414,6 +414,58 @@ console.log("T9: a single-frame skeleton collapse no longer bypasses smoothing")
   now += 33;
   const switched = T.smoothPose(mk(0.95), now);
   check("a persistent jump resets onto the new person", switched[11].x === 0.95, switched[11].x.toFixed(3));
+}
+
+console.log("T11: pose-card frames are spread over travel, not time");
+{
+  // 20 frames: the body lingers for the first half, then sweeps a wrist.
+  const frame = (w) => { const v = new Array(66).fill(0); v[30] = w; return v; };
+  const seq = [];
+  for (let i = 0; i < 10; i++) seq.push(frame(0));
+  for (let i = 0; i < 10; i++) seq.push(frame(i * 0.1));
+  const idxs = T.stripIndices(seq, 5);
+  check("five indices, first and last frame included", idxs.length === 5 && idxs[0] === 0 && idxs[4] === 19, idxs.join(","));
+  check("indices strictly increasing", idxs.every((v, k) => k === 0 || v > idxs[k - 1]));
+  const inMove = idxs.filter((i) => i >= 10).length;
+  check("cells concentrate where the body moves", inMove >= 3, idxs.join(","));
+  const still = T.stripIndices(seq.slice(0, 10), 5);
+  check("a still seq falls back to even spacing", still.length === 5 && still[0] === 0 && still[4] === 9, still.join(","));
+}
+
+console.log("T12: playback tempo rides the taught BPM, never the raw take length");
+{
+  // A short sharp take (900ms) used to count at dur/8 ~ 112ms per count.
+  const fast = T.pbTempo({ bpm: 80, durMs: 900 });
+  check("short take snaps to one bar at its BPM", fast.bars === 1 && fast.nCounts === 4 && fast.dur === 3000, JSON.stringify(fast));
+  check("counts tick on the taught quarter note", fast.beat === 750);
+  const long = T.pbTempo({ bpm: 110, durMs: 5200 });
+  check("a long take rounds to two bars, eight counts", long.bars === 2 && long.nCounts === 8);
+  const legacy = T.pbTempo({ durMs: 1000 });
+  check("codes without a stored bpm fall back to the default", legacy.beat === 750 && legacy.bars === 1);
+  check("fastest allowed bpm still counts at a danceable rate", T.pbTempo({ bpm: 160, durMs: 600 }).beat >= 375);
+}
+
+console.log("T13: per-count judging grades and combos like DDR");
+{
+  const pb = {};
+  T.judgeBeat(pb, 1000);
+  check("no accumulator: no verdict", !pb.judgeFx);
+  pb.beatAcc = { live: 2, on: 2 };
+  T.judgeBeat(pb, 1000);
+  check("too few live frames: no verdict (empty room never scolded)", !pb.judgeFx);
+  pb.beatAcc = { live: 10, on: 8 };
+  T.judgeBeat(pb, 1000);
+  check("mostly on-ring grades HIT and starts a combo", pb.judgeFx?.grade === "HIT" && pb.combo === 1);
+  pb.beatAcc = { live: 10, on: 7 };
+  T.judgeBeat(pb, 2000);
+  check("another HIT extends the combo", pb.judgeFx?.grade === "HIT" && pb.combo === 2);
+  pb.beatAcc = { live: 10, on: 3 };
+  T.judgeBeat(pb, 3000);
+  check("partially on grades CLOSE and holds the combo", pb.judgeFx?.grade === "CLOSE" && pb.combo === 2);
+  pb.beatAcc = { live: 10, on: 0 };
+  T.judgeBeat(pb, 4000);
+  check("off the rings grades MISS and breaks the combo", pb.judgeFx?.grade === "MISS" && pb.combo === 0);
+  check("the accumulator is consumed each time", pb.beatAcc === null);
 }
 
 console.log("T10: a canceled countdown takes its 'recording in' label with it");

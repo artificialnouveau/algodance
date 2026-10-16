@@ -927,35 +927,62 @@ function paintBody(ctx, P, sc, color, opts = {}) {
   }
   disc({ x: hx, y: hy }, sw * 0.29);
   // Arms on top (they carry the pose): tapered shoulder-elbow-wrist ending
-  // in a small hand.
+  // in a small hand. With opts.armSeam each arm first punches a thin seam of
+  // transparency through everything painted beneath it, so an arm crossing
+  // the torso or the face stays a readable shape instead of fusing into the
+  // same-colour silhouette. The punch starts a third of the way down the
+  // upper arm, so the shoulder stays attached to the trunk and the figure
+  // cannot fall apart into disconnected lumps (which is what a full knockout
+  // around every part used to do).
   for (const [sho, elb, wri, k1, k2] of [[11, 13, 15, 17, 19], [12, 14, 16, 18, 20]]) {
     const S = P(sho), E = P(elb), W = P(wri);
     if (!S.v || !E.v || !W.v) continue;
-    limb(S, E, sw * 0.36, sw * 0.26); // upper arm
-    limb(E, W, sw * 0.26, sw * 0.18); // forearm
     const a = P(k1), b = P(k2);
     const n = (a.v ? 1 : 0) + (b.v ? 1 : 0);
     const hand = n
       ? { x: ((a.v ? a.x : 0) + (b.v ? b.x : 0)) / n, y: ((a.v ? a.y : 0) + (b.v ? b.y : 0)) / n }
       : { x: W.x + (W.x - E.x) * 0.22, y: W.y + (W.y - E.y) * 0.22 };
+    if (opts.armSeam) {
+      const pad = sw * 0.2;
+      const S2 = { x: S.x + (E.x - S.x) * 0.35, y: S.y + (E.y - S.y) * 0.35 };
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      limb(S2, E, sw * 0.36 + pad, sw * 0.26 + pad);
+      limb(E, W, sw * 0.26 + pad, sw * 0.18 + pad);
+      limb(W, hand, sw * 0.18 + pad, sw * 0.22 + pad);
+      ctx.restore();
+    }
+    limb(S, E, sw * 0.36, sw * 0.26); // upper arm
+    limb(E, W, sw * 0.26, sw * 0.18); // forearm
     limb(W, hand, sw * 0.18, sw * 0.22); // hand: a slight distal bulge
   }
 }
 // Card figure: paintBody over a stored normalized frame.
-function paintFigure(ctx, frame, cx, cy, sc, color) {
-  paintBody(ctx, (i) => figPoint(frame, i, cx, cy, sc), sc, color, { defaultLegs: true });
+function paintFigure(ctx, frame, cx, cy, sc, color, opts) {
+  paintBody(ctx, (i) => figPoint(frame, i, cx, cy, sc), sc, color, { defaultLegs: true, ...opts });
 }
-function drawFigureCell(ctx, frame, x0, s) {
+function drawFigureCell(ctx, frame, x0, s, num = 0) {
   const cx = x0 + s * 0.5;
   const cy = s * 0.4;      // hips above centre so default legs fit below
   const sc = s * 0.19;     // torso length in px
   const off = s * 0.045;   // yellow print offset
   // Yellow layer first (offset), then red on top: the riso registration look.
+  // Only the red layer punches arm seams; punching the yellow too would just
+  // be painted over, and the surviving yellow sliver outside the seam keeps
+  // the off-register print look.
   ctx.save();
   ctx.translate(off, off * 0.7);
   paintFigure(ctx, frame, cx, cy, sc, "#ECFF00");
   ctx.restore();
-  paintFigure(ctx, frame, cx, cy, sc, "#FF002A");
+  paintFigure(ctx, frame, cx, cy, sc, "#FF002A", { armSeam: true });
+  // A typed step number in the cell corner, so the row reads in order like a
+  // contact sheet.
+  if (num) {
+    ctx.fillStyle = "rgba(28,24,21,0.55)";
+    ctx.font = '12px "Courier Prime", "Courier New", monospace';
+    ctx.textBaseline = "top";
+    ctx.fillText(String(num), x0 + 7, 6);
+  }
 }
 
 // ---- Creative live presence: constellation + light trails ----
@@ -1383,20 +1410,49 @@ function paintRisoGhost(GP, sc) {
   octx.restore();
 }
 
-// A row of `count` evenly-spaced frames from a stored seq, as one canvas.
-function buildPoseStrip(seq, { count = 3, size = 96 } = {}) {
+// Pick `count` frame indices spread over the move's PATH (weighted pose
+// distance travelled), not over elapsed time. Even-time picks wasted cells on
+// near-identical poses whenever the move lingered, and the actual gesture
+// flashed by between two cells; equal travel puts the cells where the body
+// changes. Always includes the first and last frame.
+function stripIndices(seq, count) {
+  if (count >= seq.length) return seq.map((_, i) => i);
+  const cum = [0];
+  for (let i = 1; i < seq.length; i++) cum.push(cum[i - 1] + poseDist(seq[i - 1], seq[i]));
+  const total = cum[seq.length - 1];
+  const idxs = [];
+  for (let n = 0; n < count; n++) {
+    let j;
+    if (total < 1e-9) {
+      j = Math.round((n * (seq.length - 1)) / (count - 1)); // still body: even time
+    } else {
+      const target = (n * total) / (count - 1);
+      j = 0;
+      while (j < seq.length - 1 && cum[j] < target) j++;
+    }
+    // Strictly increasing, with room left for the cells still to come.
+    const lo = n === 0 ? 0 : idxs[n - 1] + 1;
+    idxs.push(Math.min(Math.max(j, lo), seq.length - (count - n)));
+  }
+  return idxs;
+}
+
+// A row of frames from a stored seq, as one canvas. Five cells: three made a
+// move hard to identify, let alone follow. The cells are numbered and spaced
+// by travel (stripIndices), so the row reads as steps of the movement.
+function buildPoseStrip(seq, { count = 5, size = 96 } = {}) {
+  const idxs = stripIndices(seq, Math.min(count, seq.length));
   const canvas = document.createElement("canvas");
   canvas.className = "pose-strip";
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  canvas.width = size * count * dpr;
+  canvas.width = size * idxs.length * dpr;
   canvas.height = size * dpr;
-  canvas.style.width = size * count + "px";
+  canvas.style.width = size * idxs.length + "px";
   canvas.style.height = size + "px";
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
-  for (let n = 0; n < count; n++) {
-    const idx = count === 1 ? 0 : Math.round((n * (seq.length - 1)) / (count - 1));
-    drawFigureCell(ctx, seq[idx], n * size, size);
+  for (let n = 0; n < idxs.length; n++) {
+    drawFigureCell(ctx, seq[idxs[n]], n * size, size, n + 1);
   }
   return canvas;
 }
@@ -3090,7 +3146,7 @@ function finishTeach(now, timedOut = false) {
 function showTeachPreview(seq) {
   if (!teachPreview) return;
   teachPreview.innerHTML = '<div class="teach-preview-label">Saved as a pose card:</div>';
-  try { teachPreview.appendChild(buildPoseStrip(seq, { count: 3, size: 100 })); } catch {}
+  try { teachPreview.appendChild(buildPoseStrip(seq, { count: 5, size: 96 })); } catch {}
   teachPreview.hidden = false;
 }
 function clearTeachPreview() {
@@ -3131,10 +3187,11 @@ function startPlaybackItems(items, label, key) {
   updatePbControls();
   renderCodeList();
 }
-// Rehearse: the ghost demonstrates once with counts, then YOUR TURN — a
-// count-in with the start pose held faintly, you perform from memory, and
-// your attempt is scored against the word with the same matcher Perform
-// uses. Cycles demo -> your turn -> result until stopped.
+// Rehearse: the ghost demonstrates once with counts, then YOUR TURN, a
+// count-in with the start pose held faintly, then you perform along with a
+// faint guided ghost (rings and arrows stay on), and your attempt is scored
+// against the word with the same matcher Perform uses. Cycles
+// demo -> your turn -> result until stopped.
 function startRehearse(word) {
   const all = templates.filter((t) => t.word.toLowerCase() === word.toLowerCase());
   if (!all.length) return;
@@ -3456,11 +3513,11 @@ function drawGuideArrow(from, to, gsc) {
   if (len < gsc * 0.3) return;
   const ux = dx / len, uy = dy / len;
   const ex = to.x - ux * gsc * 0.28, ey = to.y - uy * gsc * 0.28;
-  const ah = Math.min(14, Math.max(7, gsc * 0.12));
+  const ah = Math.min(18, Math.max(9, gsc * 0.15));
   octx.save();
-  octx.strokeStyle = "rgba(255,0,42,0.85)";
-  octx.fillStyle = "rgba(255,0,42,0.85)";
-  octx.lineWidth = 3;
+  octx.strokeStyle = "rgba(255,0,42,0.95)";
+  octx.fillStyle = "rgba(255,0,42,0.95)";
+  octx.lineWidth = 4.5;
   octx.beginPath();
   octx.moveTo(from.x, from.y);
   octx.lineTo(ex, ey);
@@ -3474,17 +3531,18 @@ function drawGuideArrow(from, to, gsc) {
   octx.restore();
 }
 // Anticipation cue: a dashed arc tracing where each focus joint travels over
-// the NEXT count, with an arrowhead, so the learner can lead instead of lag.
-function drawPathHints(cur, p, ax, ay, asc, joints) {
+// the NEXT count (`ahead` is one count as a fraction of the move), with an
+// arrowhead, so the learner can lead instead of lag.
+function drawPathHints(cur, p, ax, ay, asc, joints, ahead = 0.125) {
   octx.save();
   octx.setLineDash([6, 6]);
-  octx.strokeStyle = "rgba(255,255,255,0.55)";
-  octx.fillStyle = "rgba(255,255,255,0.55)";
-  octx.lineWidth = 2;
+  octx.strokeStyle = "rgba(255,255,255,0.75)";
+  octx.fillStyle = "rgba(255,255,255,0.75)";
+  octx.lineWidth = 3;
   for (const j of joints) {
     const pts = [];
     for (let s = 0; s <= 5; s++) {
-      const g = ghostFrameAt(cur, Math.min(1, p + (s / 5) * 0.125), ax, ay, asc)[j];
+      const g = ghostFrameAt(cur, Math.min(1, p + (s / 5) * ahead), ax, ay, asc)[j];
       if (!g || g.visibility <= 0) { pts.length = 0; break; }
       pts.push({ x: g.x * overlay.width, y: g.y * overlay.height });
     }
@@ -3510,6 +3568,49 @@ function drawPathHints(cur, p, ax, ay, asc, joints) {
   }
   octx.restore();
 }
+// ---- DDR-style per-count judging ----
+// Every dance count gets an instant verdict instead of only a score at the
+// end: frames where ALL focus joints sit on their rings are tallied while the
+// count runs, and when it turns over the ratio grades it. HIT extends the
+// combo, CLOSE holds it, MISS breaks it. A count with too few frames of a
+// live body gives no verdict at all, so the attract ghost never scolds an
+// empty room.
+function judgeBeat(pb, now) {
+  const acc = pb.beatAcc;
+  pb.beatAcc = null;
+  if (!acc || acc.live < 3) return;
+  const r = acc.on / acc.live;
+  const grade = r >= 0.6 ? "HIT" : r >= 0.25 ? "CLOSE" : "MISS";
+  if (grade === "HIT") pb.combo = (pb.combo || 0) + 1;
+  else if (grade === "MISS") pb.combo = 0;
+  pb.judgeFx = { grade, combo: pb.combo || 0, at: now };
+}
+// The verdict as a printed stamp above the ghost's head, with the running
+// streak. Ink shadow first, colour on top, popping as it lands then fading.
+function drawJudgeFx(pb, GP, gsc, now) {
+  const fx = pb.judgeFx;
+  if (!fx) return;
+  const age = now - fx.at;
+  if (age > 900) { pb.judgeFx = null; return; }
+  const head = GP(0);
+  if (!head.v) return;
+  const a = age < 600 ? 1 : 1 - (age - 600) / 300;
+  const pop = 1 + 0.25 * Math.max(0, 1 - age / 150);
+  const size = Math.max(16, gsc * 0.34) * pop;
+  const col = fx.grade === "HIT" ? "#ECFF00" : fx.grade === "CLOSE" ? "#F4EEE0" : "#FF002A";
+  const text = fx.grade + (fx.combo > 1 ? ` x${fx.combo}` : "");
+  octx.save();
+  octx.globalAlpha = Math.max(0, a);
+  octx.font = `800 ${Math.round(size)}px Archivo, system-ui, sans-serif`;
+  octx.textAlign = "center";
+  octx.textBaseline = "bottom";
+  const x = head.x, y = head.y - gsc * 0.8;
+  octx.fillStyle = "rgba(28,24,21,0.9)";
+  octx.fillText(text, x + 2, y + 2);
+  octx.fillStyle = col;
+  octx.fillText(text, x, y);
+  octx.restore();
+}
 // Score a rehearse attempt against the word's examples, same matcher as
 // Perform (DTW + the word's own threshold).
 function scoreRehearse(pb) {
@@ -3528,6 +3629,20 @@ function scoreRehearse(pb) {
     ? { ok, pct, big: `${pct}%`, msg: `Nailed it: ${pct}% match. Again…` }
     : { ok, pct, big: `${pct}%`, msg: `${pct}%, not quite.${hint} Again…` };
 }
+// Playback counts ride the move's own taught metronome (the BPM box on the
+// Teach tab, stored per code), not its raw recorded length. The old dur/8
+// subdivision made a short sharp take's counts race by at ~100ms, unreadably
+// fast, and even a normal take counted at a tempo unrelated to the one it was
+// taught at. The move is snapped to whole four-count bars of its BPM (one bar
+// for nearly every code, two for long ones) and the counts tick on the taught
+// quarter note, exactly like the teach-recording metronome and the tutorial.
+// Rehearse scoring is DTW, which ignores tempo, so none of this changes what
+// counts as a hit. Codes saved before bpm was stored fall back to the default.
+function pbTempo(cur) {
+  const beat = 60000 / (cur.bpm || DEFAULT_BPM);
+  const bars = Math.min(2, Math.max(1, Math.round((cur.durMs || 4 * beat) / (4 * beat))));
+  return { beat, bars, nCounts: 4 * bars, dur: 4 * bars * beat };
+}
 function drawPlayback(now) {
   const pb = playback;
   // Playback runs on its OWN clock: the speed chips stretch it, Steps mode
@@ -3539,9 +3654,8 @@ function drawPlayback(now) {
   const routineMode = pb.mode === "routine";
   const step = routineMode ? pb.steps[Math.min(pb.stepIdx, pb.steps.length - 1)] : null;
   const cur = routineMode ? step.rep : pb.items[Math.min(pb.idx, pb.items.length - 1)];
-  const dur = Math.min(5000, Math.max(800, cur.durMs || 2000));
-  const beat = dur / 8;
-  const lead = beat * 4; // the "5 6 7 8" count-in
+  const { beat, nCounts, dur } = pbTempo(cur);
+  const lead = beat * 4; // the "5 6 7 8" count-in: one full bar
   if (pb.focusFor !== cur) {
     pb.focusFor = cur;
     pb.focus = focusJoints(cur.seq);
@@ -3554,6 +3668,8 @@ function drawPlayback(now) {
     pb.lastCount = 0;
     pb.stepDone = 0;
     pb.cueShown = false;
+    pb.beatAcc = null; // each phase is its own round: fresh judge and combo
+    pb.combo = 0;
   };
 
   // Routine: each step opens with a cue card naming the next move.
@@ -3574,6 +3690,8 @@ function drawPlayback(now) {
     pb.tRel = 0;
     pb.lastCount = 0;
     pb.stepDone = 0;
+    pb.beatAcc = null; // a new item is a new chart: fresh judge and combo
+    pb.combo = 0;
     if (pb.idx >= pb.items.length) {
       if (pbLoop) {
         pb.idx = 0;
@@ -3629,7 +3747,7 @@ function drawPlayback(now) {
     p = leading ? 0 : (pb.tRel - lead) / dur;
     count = leading
       ? 5 + Math.min(3, Math.floor(pb.tRel / beat))
-      : 1 + Math.min(7, Math.floor(p * 8));
+      : 1 + Math.min(nCounts - 1, Math.floor(p * nCounts));
   } else if (ph === "cue") {
     leading = true;
     ghostAlpha = 0.3; // the next move's start pose, faintly, under the cue card
@@ -3639,8 +3757,8 @@ function drawPlayback(now) {
     count = 5 + Math.min(3, Math.floor(pb.tRel / beat));
   } else if (ph === "turn") {
     p = Math.min(1, pb.tRel / dur);
-    count = 1 + Math.min(7, Math.floor(Math.min(0.999, pb.tRel / dur) * 8));
-    showGhost = false; // from memory: only the counts carry you
+    count = 1 + Math.min(nCounts - 1, Math.floor(Math.min(0.999, pb.tRel / dur) * nCounts));
+    ghostAlpha = 0.45; // guided turn: a faint ghost with rings and arrows carries you
   } else {
     showGhost = false; // result: the verdict is on screen
   }
@@ -3708,7 +3826,7 @@ function drawPlayback(now) {
       // Where each focus joint goes NEXT (dashed), then the rings with live
       // feedback: filled solid when your joint is in place, hollow with a
       // red guide arrow when it is not.
-      if (!leading && !pb.waiting && p < 0.999) drawPathHints(cur, p, ax, ay, asc, pb.focus.joints);
+      if (!leading && !pb.waiting && p < 0.999) drawPathHints(cur, p, ax, ay, asc, pb.focus.joints, 1 / nCounts);
       const targets = pbTargets(GP, gsc, pb.focus.joints, now);
       const pulse = 1 + 0.15 * Math.sin(now / 130);
       let ringCount = 0, onCount = 0;
@@ -3739,6 +3857,13 @@ function drawPlayback(now) {
           if (t) drawGuideArrow(t, q, gsc);
         }
       }
+      // Feed the per-count judge while the move runs and a dancer is tracked:
+      // the demo dance-along, the attract loop, and the guided turn all grade.
+      if (!leading && !pb.waiting && ringCount > 0 && targets.size > 0) {
+        (pb.beatAcc ||= { live: 0, on: 0 }).live++;
+        if (onCount === ringCount) pb.beatAcc.on++;
+      }
+      drawJudgeFx(pb, GP, gsc, now);
       // Steps: release the freeze when every visible focus joint is in place
       // (and at least one live joint was actually seen), or on Space.
       if (pb.waiting && (pb.skipStep || (ringCount > 0 && targets.size > 0 && onCount === ringCount))) {
@@ -3755,12 +3880,15 @@ function drawPlayback(now) {
     }
   }
 
-  // Counts: numeral + dot strip, updated only when the count changes.
+  // Counts: numeral + dot strip, updated only when the count changes. A
+  // count turning over (or the counts ending) grades the one just finished.
   if (count == null) {
+    judgeBeat(pb, now);
     danceCount.hidden = true;
     countLabel.hidden = true;
     countDots.hidden = true;
   } else if (pb.lastCount !== count || pb.lastLead !== leading) {
+    judgeBeat(pb, now);
     pb.lastCount = count;
     pb.lastLead = leading;
     danceCount.hidden = false;
@@ -3774,6 +3902,7 @@ function drawPlayback(now) {
     void danceCount.offsetWidth; // restart the pop animation
     danceCount.classList.add("tick");
     countDots.hidden = false;
+    countDots.classList.toggle("four", nCounts === 4); // one-bar moves count 1-4, like teach
     const kids = countDots.children;
     for (let k = 0; k < kids.length; k++) {
       kids[k].className = !leading && k < count ? (k === count - 1 ? "cur" : "on") : "";
@@ -3785,9 +3914,9 @@ function drawPlayback(now) {
   if (ph === "cue") {
     statusEl.textContent = `Routine ${pb.stepIdx + 1}/${pb.steps.length}: next is “${step.word}”…`;
   } else if (ph === "turnLead") {
-    statusEl.textContent = `Your turn: perform “${pb.label}” from memory after the count-in…`;
+    statusEl.textContent = `Your turn after the count-in: perform “${pb.label}” with the faint ghost…`;
   } else if (ph === "turn") {
-    statusEl.textContent = `Go! Perform “${pb.label}”.`;
+    statusEl.textContent = `Go! Follow the faint ghost and the arrows.`;
   } else if (ph === "result") {
     statusEl.textContent = pb.result.msg;
   } else if (ph === "done") {
